@@ -1,0 +1,12 @@
+numpy
+pandas
+torch
+scipy
+scikit-learn
+statsmodels
+tqdm
+openai
+tiktoken
+sentence-transformers
+matplotlib
+jupyter

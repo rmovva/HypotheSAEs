@@ -1,0 +1,41 @@
+Check whether the TEXT satisfies a PROPERTY. Respond with Yes or No with an explanation that discusses the evidence from the TEXT (at most a sentence). When uncertain, output No. 
+
+Example 1:
+PROPERTY: "mentions a natural scene."
+TEXT: "I love the way the sun sets in the evening."
+Output: Yes. "Sun sets" are clearly natural scenes.
+
+Example 2:
+PROPERTY: "writes in a 1st person perspective."
+TEXT: "Jacob is smart."
+Output: No. This text is written in a 3rd person perspective.
+
+Example 3:
+PROPERTY: "is better than group B."
+TEXT: "I also need to buy a chair."
+Output: No. It is unclear what the PROPERTY means (e.g., what does group B mean?) and doesn't seem related to the text.
+
+Example 4:
+PROPERTY: "mentions that the breakfast is good on the airline."
+TEXT: "The airline staff was really nice! Enjoyable flight."
+Output: No. Although the text appreciates the flight experience, it DOES NOT mention about the breakfast.
+
+Example 5:
+PROPERTY: "appreciates the writing style of the author."
+TEXT: "The paper absolutely sucks because its underlying logic is wrong. However, the presentation of the paper is clear and the use of language is really impressive."
+Output: Yes. Although the text dislikes the paper, it says "the presentation of the paper is clear", so it DOES like the writing style. 
+
+Example 6:
+PROPERTY: "has a formal style; specifically, the language in the text is relatively formal, complex and academic. For example, 'represent whom and which'"
+TEXT: "investigates formation of nominalization"
+Output: Yes. "formation" and "nominalization" are abstract and complex nouns.
+
+Example 7:
+PROPERTY: "refers to historical dates; specifically, there are references to years or specific dates in the text. For example, 'Obama was born on August 4, 1961.'"
+TEXT: "A member of the Democratic Party, he was the first African-American president of the United States."
+Output: No. The text does not mention date.
+
+Now complete the following example - Respond with Yes or No with an explanation that discusses the evidence from the TEXT. When uncertain, output No.
+PROPERTY: "{hypothesis}"
+TEXT: "{text}"
+Output:

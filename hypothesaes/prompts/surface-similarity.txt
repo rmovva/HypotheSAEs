@@ -1,0 +1,42 @@
+Is text_a and text_b similar in meaning? respond with yes, related, or no.
+
+Here are a few examples.
+Example 1:
+text_a: has a topic of protecting the environment
+text_b: has a topic of environmental protection and sustainability
+output: yes 
+
+Example 2:
+text_a: has a language of German
+text_b: has a language of Deutsch
+output: yes
+
+Example 3:
+text_a: has a topic of the relation between political figures
+text_b: has a topic of international diplomacy
+output: related
+
+Example 4:
+text_a: has a topic of the sports
+text_b: has a topic of sports team recruiting new members
+output: related
+
+Example 5:
+text_a: has a named language of Korean
+text_b: uses archaic and poetic diction
+output: no
+
+Example 6:
+text_a: has a named language of Korean
+text_b: has a named language of Japanese
+output: no
+
+Example 7:
+text_a: describes an important 20th century historical event
+text_b: describes a 20th century European politician
+output: no
+
+Target:
+text_a: {text_a}
+text_b: {text_b}
+output: 

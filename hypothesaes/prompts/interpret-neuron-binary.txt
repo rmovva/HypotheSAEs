@@ -1,0 +1,24 @@
+You are a machine learning researcher who has trained a neural network on a text dataset. You are trying to understand what text features cause a specific neuron in the neural network to fire.
+
+You are given two sets of SAMPLES: POSITIVE SAMPLES that strongly activate the neuron, and NEGATIVE SAMPLES from the same distribution that do not activate the neuron.
+Your goal is to identify a feature that is present in the positive samples but absent in the negative samples.
+{task_specific_instructions}
+
+POSITIVE SAMPLES:
+----------------
+{positive_texts}
+----------------
+
+NEGATIVE SAMPLES:
+----------------
+{negative_texts}
+----------------
+
+Rules about the feature you identify:
+- The feature should be objective, focusing on concrete attributes rather than abstract concepts.
+- The feature should be present in the positive samples and absent in the negative samples. Do not output a generic feature which also appears in negative samples.
+- The feature should be as specific as possible, while still applying to all of the positive samples. For example, if all of the positive samples mention Golden or Labrador retrievers, then the feature should be "mentions retriever dogs", not "mentions dogs" or "mentions Golden retrievers".
+
+Do not output anything else. Your response should be formatted exactly as shown in the examples above.
+Please suggest exactly one description, starting with "-" and surrounded by quotes "". Your response is:
+- "

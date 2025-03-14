@@ -74,15 +74,16 @@ def get_completion(
             if attempt == max_retries - 1:  # Last attempt
                 raise TimeoutError(f"API request timed out after {request_timeout}s")
             if attempt > 0:
-                print(f"API timeout, retrying in {backoff_factor ** attempt:.1f}s... ({attempt + 1}/{max_retries})")
-            time.sleep(backoff_factor ** attempt)
+                wait_time = request_timeout * (backoff_factor ** attempt)
+                print(f"API timeout, retrying in {wait_time:.1f}s... ({attempt + 1}/{max_retries})")
+                time.sleep(wait_time)
 
         except Exception as e:
             if attempt == max_retries - 1:  # Last attempt
                 raise e
             
             # Exponential backoff
-            wait_time = (backoff_factor ** attempt)
+            wait_time = (request_timeout * (backoff_factor ** attempt))
             print(f"API error, retrying in {wait_time:.1f}s... ({attempt + 1}/{max_retries})")
             time.sleep(wait_time)
 

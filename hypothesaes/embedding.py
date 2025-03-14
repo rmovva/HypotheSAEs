@@ -24,7 +24,7 @@ def _embed_batch_openai(
         max_tokens: int = 8192, 
         max_retries: int = 3, 
         backoff_factor: float = 2.0,
-        timeout: float = 2.0,
+        timeout: float = 10.0,
 ) -> List[List[float]]:
     """Helper function for batch embedding using OpenAI API."""
     # Truncate texts to max tokens

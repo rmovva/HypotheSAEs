@@ -7,7 +7,8 @@ import concurrent.futures
 import os
 from dataclasses import dataclass, field
 
-from .utils import load_prompt, truncate_text, get_completion
+from .llm_api import get_completion
+from .utils import load_prompt, truncate_text
 from .annotate import annotate, CACHE_DIR
 
 DEFAULT_TASK_SPECIFIC_INSTRUCTIONS = """An example feature could be:

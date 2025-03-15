@@ -9,7 +9,8 @@ import json
 from pathlib import Path
 import time
 
-from .utils import load_prompt, truncate_text, get_completion
+from .llm_api import get_completion
+from .utils import load_prompt, truncate_text
 
 CACHE_DIR = os.path.join(Path(__file__).parent.parent, 'annotation_cache')
 DEFAULT_N_WORKERS = 30 

@@ -9,7 +9,8 @@ from scipy.optimize import linear_sum_assignment
 import statsmodels.api as sm
 from tqdm.auto import tqdm
 
-from .utils import get_completion, load_prompt
+from .llm_api import get_completion
+from .utils import load_prompt
 
 def compute_pairwise_correlation_matrix(
     reference_hypotheses: Dict[str, np.ndarray],

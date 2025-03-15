@@ -11,7 +11,7 @@ from pathlib import Path
 import glob
 import torch
 
-from .utils import client, filter_invalid_texts
+from .utils import filter_invalid_texts
 
 # Use environment variable for cache dir if set, otherwise use default
 CACHE_DIR = os.getenv('EMB_CACHE_DIR') or os.path.join(Path(__file__).parent.parent, 'emb_cache')
@@ -21,6 +21,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 def _embed_batch_openai(
         batch: List[str], 
         model: str, 
+        client,
         max_tokens: int = 8192, 
         max_retries: int = 3, 
         backoff_factor: float = 2.0,
@@ -28,7 +29,7 @@ def _embed_batch_openai(
 ) -> List[List[float]]:
     """Helper function for batch embedding using OpenAI API."""
     # Truncate texts to max tokens
-    enc = tiktoken.get_encoding("cl100k_base")  # encoding for text-embedding-3-large
+    enc = tiktoken.get_encoding("cl100k_base")  # encoding for OpenAI text-embedding models
     truncated_batch = []
     for text in batch:
         tokens = enc.encode(text.strip())
@@ -151,6 +152,9 @@ def get_openai_embeddings(
     if not texts_to_embed:
         return text2embedding
     
+    from .llm_api import get_client
+    client = get_client()
+    
     # Process in chunks
     next_chunk_idx = _get_next_chunk_index(cache_name)
     
@@ -173,7 +177,7 @@ def get_openai_embeddings(
         with concurrent.futures.ThreadPoolExecutor(max_workers=n_workers) as executor:
             futures = []
             for batch in batches:
-                futures.append(executor.submit(_embed_batch_openai, batch, model, timeout=timeout))
+                futures.append(executor.submit(_embed_batch_openai, batch, model, client, timeout=timeout))
             
             # Process results as they complete
             iterator = concurrent.futures.as_completed(futures)

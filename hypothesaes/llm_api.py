@@ -22,8 +22,8 @@ model_abbrev_to_id = {
 def get_client():
     """Get the OpenAI client, initializing it if necessary."""
     api_key = os.environ.get('OPENAI_KEY_SAE')
-    if api_key is None:
-        raise ValueError("Please set the OPENAI_KEY_SAE environment variable before using OpenAI API features.")
+    if api_key is None or '...' in api_key:
+        raise ValueError("Please set the OPENAI_KEY_SAE environment variable before using functions which require the OpenAI API.")
     
     return openai.OpenAI(api_key=api_key)
 

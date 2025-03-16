@@ -1,12 +1,12 @@
 *DS_Store*
 emb_cache
 emb_cache/*
-*annotation_cache/*
+*annotation_cache*
 *.pth
 models/*
 wandb/*
 data/*
-checkpoints/*
+*checkpoints*
 *cache*
 
 # Byte-compiled / optimized / DLL files

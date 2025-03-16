@@ -6,7 +6,7 @@ with open('requirements.txt') as f:
 
 setup(
     name="hypothesaes",
-    version="0.0.1",
+    version="0.0.2",
     packages=find_packages(),
     python_requires='>=3.9',
     author="Rajiv Movva, Kenny Peng",
@@ -16,6 +16,7 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/rmovva/HypotheSAEs",
     install_requires=requirements,
+    include_package_data=True,
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",

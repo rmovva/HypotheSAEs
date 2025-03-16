@@ -15,7 +15,7 @@ def load_prompt(prompt_name: str) -> str:
         with open(prompt_path) as f:
             return f.read()
     except FileNotFoundError:
-        raise FileNotFoundError(f"File not found: {prompt_path}; please ensure it's in the src/prompts/ directory")
+        raise FileNotFoundError(f"File not found: {prompt_path}; please ensure it's in the hypothesaes/prompts/ directory")
 
 def truncate_text(
     text: str,

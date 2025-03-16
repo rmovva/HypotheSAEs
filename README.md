@@ -52,13 +52,25 @@ After generating hypotheses, you can test whether they generalize on a heldout s
 
 ## Setup
 
-Clone the repo and install in editable mode. This will also install any missing dependencies.
+### Option 1: Clone repo (recommended)
+
+Clone the repo and install in editable mode. This will give you access to all of the example notebooks, which are helpful for getting started. You'll also be able to edit the code directly.
 
 ```bash
 git clone https://github.com/rmovva/hypothesaes.git
 cd hypothesaes
 pip install -e .
 ```
+
+### Option 2: Install from PyPI
+
+Alternatively, you can install the package directly from PyPI:
+
+```bash
+pip install hypothesaes
+```
+
+Note: If using this option, you'll need to separately download any example notebooks you want to use from the [GitHub repository](https://github.com/rmovva/hypothesaes/tree/main/notebooks).
 
 ## Quickstart
 
@@ -75,7 +87,7 @@ Alternatively, you can set the key in Python (*before* importing any SAE functio
 1. **Generate text embeddings.** You can either (1) provide your own embeddings, (2) use the OpenAI API, or (3) use a SentenceTransformers model locally:
 
 ```python
-from src.embedding import get_openai_embeddings, get_local_embeddings
+from hypothesaes.embedding import get_openai_embeddings, get_local_embeddings
 
 texts = ["text1", "text2", ...]  # List of text examples
 
@@ -93,14 +105,14 @@ embeddings = np.stack([text2embedding[text] for text in texts])
 
 2. **Train an SAE** on the text embeddings. Note that $M$ and $K$ are key hyperparameters; read below for heuristics on choosing them.
 ```python
-from src.quickstart import train_sae
+from hypothesaes.quickstart import train_sae
 
 sae = train_sae(embeddings=embeddings, M=256, K=8, checkpoint_dir="checkpoints/my_dataset_openai-small")
 ```
 
 3. **Interpret random neurons** to explore the concepts learned by the SAE. This will output a random sample of neurons, their interpreted labels, and text examples which strongly activate them:
 ```python
-from src.quickstart import interpret_sae
+from hypothesaes.quickstart import interpret_sae
 
 interpretations = interpret_sae(
     texts=texts,
@@ -112,7 +124,7 @@ interpretations = interpret_sae(
 
 4. **Generate hypotheses** about which neurons are predictive of your target variable:
 ```python
-from src.quickstart import generate_hypotheses
+from hypothesaes.quickstart import generate_hypotheses
 
 hypotheses = generate_hypotheses(
     texts=texts,
@@ -128,7 +140,7 @@ display(hypotheses)
 
 5. **Evaluate hypothesis generalization** on a heldout set:
 ```python
-from src.quickstart import evaluate_hypotheses
+from hypothesaes.quickstart import evaluate_hypotheses
 
 metrics, evaluation_df = evaluate_hypotheses(
     hypotheses_df=hypotheses,
@@ -278,7 +290,7 @@ If you would like to run the method on a pairwise dataset, see how we generate r
 
 Train Sparse Autoencoders given train text embeddings, M, and K. You can also provide validation embeddings, which are used for early stopping (if validation reconstruction loss does not decrease for a specified number of epochs).
 ```python
-from src.sae import SparseAutoencoder, load_model
+from hypothesaes.sae import SparseAutoencoder, load_model
 
 # Convert to PyTorch tensors
 X_train = torch.tensor(train_embeddings, dtype=torch.float32).to(device)
@@ -316,7 +328,7 @@ Note that the sparse autoencoder constructor, and the `fit()` method, accept man
 
 Select neurons that are predictive of your target variable:
 ```python
-from src.select_neurons import select_neurons
+from hypothesaes.select_neurons import select_neurons
 
 # Select neurons using different methods
 selected_neurons, scores = select_neurons(
@@ -341,7 +353,7 @@ You can also implement your own selection method: the function should take in ne
 
 Interpret what concepts the selected neurons represent:
 ```python
-from src.interpret_neurons import NeuronInterpreter, InterpretConfig, SamplingConfig, LLMConfig
+from hypothesaes.interpret_neurons import NeuronInterpreter, InterpretConfig, SamplingConfig, LLMConfig
 
 # Task-specific instructions help the LLM generate better interpretations
 TASK_SPECIFIC_INSTRUCTIONS = """All of the texts are reviews of restaurants on Yelp.
@@ -410,8 +422,8 @@ best_interp_df = pd.DataFrame({
 
 Annotate texts with concepts and evaluate how well they predict your target variable:
 ```python
-from src.annotate import annotate_texts_with_concepts
-from src.evaluation import score_hypotheses
+from hypothesaes.annotate import annotate_texts_with_concepts
+from hypothesaes.evaluation import score_hypotheses
 
 # Evaluate hypotheses on a holdout set
 holdout_annotations = annotate_texts_with_concepts(

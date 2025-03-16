@@ -1,7 +1,7 @@
 """HypotheSAEs: SAEs for hypothesis generation."""
 
 # Version information
-__version__ = "0.0.1"
+__version__ = "0.0.3"
 
 # Import key functions and classes to expose at the package level
 from .quickstart import (

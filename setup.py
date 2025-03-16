@@ -6,7 +6,7 @@ with open('requirements.txt') as f:
 
 setup(
     name="hypothesaes",
-    version="0.0.2",
+    version="0.0.3",
     packages=find_packages(),
     python_requires='>=3.9',
     author="Rajiv Movva, Kenny Peng",

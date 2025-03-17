@@ -43,7 +43,7 @@ def annotate_single_text(
     max_words_per_example: Optional[int] = None,
     temperature: float = 0.0,
     max_retries: int = 3,
-    request_timeout: float = 1.0
+    timeout: float = 1.0
 ) -> Tuple[Optional[int], float]:  # Return tuple of (result, api_time)
     """
     Annotate a single text with given concept using LLM.
@@ -64,7 +64,7 @@ def annotate_single_text(
                 model=model,
                 temperature=temperature,
                 max_tokens=1,
-                request_timeout=request_timeout
+                timeout=timeout
             ).strip().lower()
             total_api_time += time.time() - start_time
             

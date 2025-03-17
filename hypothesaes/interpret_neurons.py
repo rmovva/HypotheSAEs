@@ -141,7 +141,7 @@ class SamplingConfig:
 class LLMConfig:
     temperature: float = 0.7 # Temperature for the interpreter model
     max_interpretation_tokens: int = 100 # Maximum number of tokens for each generated interpretation
-    request_timeout: float = 2.0 # Timeout for the interpreter model (in seconds)
+    timeout: float = 2.0 # Timeout for the interpreter model (in seconds)
 
 @dataclass
 class InterpretConfig:
@@ -199,7 +199,7 @@ class NeuronInterpreter:
                 model=self.interpreter_model,
                 temperature=config.llm.temperature,
                 max_tokens=config.llm.max_interpretation_tokens,
-                request_timeout=config.llm.request_timeout
+                timeout=config.llm.timeout
             )
         
         return self._parse_interpretation(response)

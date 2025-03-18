@@ -34,7 +34,7 @@ def get_completion(
     max_tokens: int = 1000,
     timeout: float = 30.0,
     max_retries: int = 3,
-    backoff_factor: float = 2.0,
+    backoff_factor: float = 3.0,
 ) -> str:
     """Get completion from OpenAI API with retry logic."""
     client = get_client()

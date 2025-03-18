@@ -24,7 +24,7 @@ def _embed_batch_openai(
         client,
         max_tokens: int = 8192, 
         max_retries: int = 3, 
-        backoff_factor: float = 2.0,
+        backoff_factor: float = 3.0,
         timeout: float = 10.0,
 ) -> List[List[float]]:
     """Helper function for batch embedding using OpenAI API."""
@@ -135,11 +135,11 @@ def get_openai_embeddings(
     texts: List[str],
     model: str = "text-embedding-3-small",
     batch_size: int = 256,
-    n_workers: int = 10,
+    n_workers: int = 5,
     cache_name: Optional[str] = None,
     show_progress: bool = True,
     chunk_size: int = 50000,
-    timeout: float = 2.0,
+    timeout: float = 10.0,
 ) -> Dict[str, np.ndarray]:
     """Get embeddings using OpenAI API with parallel processing and chunked caching."""
     # Filter out None values and empty strings

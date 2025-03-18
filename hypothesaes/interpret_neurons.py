@@ -141,7 +141,7 @@ class SamplingConfig:
 class LLMConfig:
     temperature: float = 0.7 # Temperature for the interpreter model
     max_interpretation_tokens: int = 100 # Maximum number of tokens for each generated interpretation
-    timeout: float = 2.0 # Timeout for the interpreter model (in seconds)
+    timeout: float = 10.0 # Timeout for the interpreter model (in seconds)
 
 @dataclass
 class InterpretConfig:

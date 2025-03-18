@@ -10,6 +10,17 @@ Data 🤗: https://huggingface.co/datasets/rmovva/HypotheSAEs (to reproduce the 
 
 Please either open an issue, or contact us at rmovva@berkeley.edu and kennypeng@cs.cornell.edu, if you have any questions or suggestions.
 
+## Table of Contents
+
+- [FAQ](#faq)
+- [Method](#method)
+- [Usage](#usage)
+  - [Setup](#setup)
+  - [Quickstart](#quickstart)
+  - [Tips for better results](#tips-for-better-results)
+  - [Detailed usage notes](#detailed-usage-notes)
+- [Citation](#citation)
+
 ## FAQ
 
 1. **What do I need to run HypotheSAEs?**  
@@ -18,20 +29,23 @@ You need a dataset of texts (e.g., news headlines), a target variable (e.g., cli
 2. **How do I get started?**  
 See the [Quickstart](#quickstart) section. The easiest way to get started is to clone and install the repo, and then adapt the [quickstart notebook](https://github.com/rmovva/hypothesaes/blob/main/notebooks/quickstart.ipynb) to your dataset.
 
-3. **Which LLMs does HypotheSAEs support?**  
+3. **Which LLMs can I use?**  
 Currently, **running HypotheSAEs requires using the OpenAI API**, at minimum to query LLMs for feature interpretation, but also optionally to compute text embeddings and evaluate hypothesis generalization. By default, we use GPT-4o for interpretation and GPT-4o-mini for concept annotation; these can be changed.
-We are in the process of expanding compatibility to other model providers (Anthropic, Google Gemini, etc.): please send us a note if this is critical to your workflow so that we can prioritize it. 
+We are working to expand compatibility to other model providers (Anthropic, Google Gemini, etc.): please send us a note if this is critical to your workflow so that we can prioritize it. 
 (Note that if data privacy is a concern, [upon request](https://help.openai.com/en/articles/8660679-how-can-i-get-a-business-associate-agreement-baa-with-openai-for-the-api-services), OpenAI may agree to a custom data retention policy.)
 
 4. **What tasks does HypotheSAEs support?**  
 Currently, the repo only supports **binary classification** and **regression** tasks. For target variables which have multiple categorical classes, we recommend using a one-vs-rest approach to convert the problem to binary classification. We hope to implement a feature selection method which natively supports multiclass classification in the future.  
-You can also use HypotheSAEs to study pairwise tasks (regression or classification), e.g., whether a news headline is more likely to be clicked on than another. See the experiment reproduction notebook for an example of this on the Headlines dataset.
+You can also use HypotheSAEs to study pairwise tasks (regression or classification), e.g., whether a news headline is more likely to be clicked on than another. See the [experiment reproduction notebook](https://github.com/rmovva/hypothesaes/blob/main/notebooks/experiment_reproduction.ipynb) for an example of this on the Headlines dataset.
 
-5. **How much does HypotheSAEs cost?**  
+5. **How much does it cost?**  
 See the [Cost](#cost) section for an example breakdown.
 
-6. **What compute infrastructure does HypotheSAEs require?**  
-Using a GPU will speed up SAE training for large datasets, but we found that even on a laptop, training an SAE doesn't take prohibitively long (i.e., minutes to hours). If it is too slow, subsampling your dataset may be helpful. Google Colab also offers free/low-cost GPU access.
+6. **Do I need a GPU?**  
+No, it should run on a laptop. Since we use API calls for LLM inference, GPUs won't help with that. GPUs *will* speed up SAE training, but we found that even on a laptop CPU, training doesn't take prohibitively long (i.e., minutes to hours). If it is too slow (e.g. your dataset is very large), you can (i) try subsampling your dataset or (ii) use Google Colab. 
+
+7. **What other resources will I need?**  
+You'll need enough disk space to store your text embeddings, and enough RAM to load in the embeddings for SAE training. On an 8GB laptop, we started running out of RAM when trying to load in ~500K embeddings.
 
 *You don't need _great_ predictions, just some signal above random chance. For example, predicting social media post engagement from text alone would have modest (but probably statistically significant) performance. To evaluate whether you have signal, you can first try training a simple linear model to predict the target variable from text embeddings. If you don't see _any_ predictive signal, HypotheSAEs is unlikely to be useful, since the method relies only in the information present on the input text representations.
 
@@ -87,7 +101,7 @@ Alternatively, you can set the key in Python (*before* importing any SAE functio
 1. **Generate text embeddings.** You can either (1) provide your own embeddings, (2) use the OpenAI API, or (3) use a SentenceTransformers model locally:
 
 ```python
-from hypothesaes.embedding import get_openai_embeddings, get_local_embeddings
+from hypothesaes import get_openai_embeddings, get_local_embeddings
 
 texts = ["text1", "text2", ...]  # List of text examples
 
@@ -105,14 +119,14 @@ embeddings = np.stack([text2embedding[text] for text in texts])
 
 2. **Train an SAE** on the text embeddings. Note that $M$ and $K$ are key hyperparameters; read below for heuristics on choosing them.
 ```python
-from hypothesaes.quickstart import train_sae
+from hypothesaes import train_sae
 
 sae = train_sae(embeddings=embeddings, M=256, K=8, checkpoint_dir="checkpoints/my_dataset_openai-small")
 ```
 
 3. **Interpret random neurons** to explore the concepts learned by the SAE. This will output a random sample of neurons, their interpreted labels, and text examples which strongly activate them:
 ```python
-from hypothesaes.quickstart import interpret_sae
+from hypothesaes import interpret_sae
 
 interpretations = interpret_sae(
     texts=texts,
@@ -124,7 +138,7 @@ interpretations = interpret_sae(
 
 4. **Generate hypotheses** about which neurons are predictive of your target variable:
 ```python
-from hypothesaes.quickstart import generate_hypotheses
+from hypothesaes import generate_hypotheses
 
 hypotheses = generate_hypotheses(
     texts=texts,
@@ -140,7 +154,7 @@ display(hypotheses)
 
 5. **Evaluate hypothesis generalization** on a heldout set:
 ```python
-from hypothesaes.quickstart import evaluate_hypotheses
+from hypothesaes import evaluate_hypotheses
 
 metrics, evaluation_df = evaluate_hypotheses(
     hypotheses_df=hypotheses,
@@ -153,7 +167,7 @@ display(evaluation_df)
 print(metrics)
 ```
 
-The output of step 5 is a table of hypotheses with metrics summarizing how well they predict the target variable:
+The output of step 5 is a table of hypotheses with metrics summarizing how well they predict the target variable (the below results are from the [experiment reproduction notebook](https://github.com/rmovva/hypothesaes/blob/main/notebooks/experiment_reproduction.ipynb)):
 
 <p align="center">
   <img src="Congress_Example_Output.png" width="90%" alt="HypotheSAEs Schematic">
@@ -180,7 +194,7 @@ Generating hypotheses using 20K Yelp reviews on the quickstart dataset takes ~2 
 
 Evaluating hypothesis generalization for 20 hypotheses on a heldout set of 2K reviews requires 40K annotations. With GPT-4o-mini, this costs $3.50 and takes ~10 minutes using 30 parallel workers (the default value, but this may need to be reduced depending on your token rate limits).
 
-## Tips for better usage and results
+## Tips for better results
 
 ### tl;dr
 
@@ -235,10 +249,10 @@ Three methods for selecting predictive neurons, implemented in `src/select_neuro
 - Selects for both effect size and prevalence
 
 **Separation score**
-- $\text{sep}(i) = E[y \mid a_i \in \text{top-100}(a_i)] - E[y \mid a_i = 0]$ where $\text{top-100}(a_i)$ are the 100 highest activation values
+- $\text{sep}(i) = E[y \mid a_i \in \text{top-}N(a_i)] - E[y \mid a_i = 0]$ where $\text{top-}N(a_i)$ are the $N$ top-activating examples for neuron $i$
 - Select top `n_select` neurons with largest absolute values
 - Fast
-- `n_top_activating` controls the number of examples which count as "high-activating", default 100
+- `n_top_activating` controls the number of examples which count as "positives" when computing separation score
 - Focuses on effect size over frequency
 
 **LASSO**
@@ -275,8 +289,8 @@ Optional parameters:
 - `n_candidate_interpretations`: Number of candidate interpretations per neuron (default: 1)
 - `n_scoring_examples`: Number of examples for scoring interpretations (default: 100)
 - `scoring_metric`: Metric for ranking interpretations ("f1", "precision", "recall", "correlation")
-- `n_workers_interpretation`: Number of parallel workers for interpretation API calls (default: 10; note that this might need to be reduced depending on your OpenAI Tier)
-- `n_workers_annotation`: Number of parallel workers for annotation API calls (default: 30; note that this might need to be reduced depending on your OpenAI Tier)
+- `n_workers_interpretation`: Number of parallel workers for interpretation API calls (default: 10; note that if you are getting errors due to OpenAI rate limits, this parameter should be reduced)
+- `n_workers_annotation`: Number of parallel workers for annotation API calls (default: 30; note that if you are getting errors due to OpenAI rate limits, this parameter should be reduced)
 - `task_specific_instructions`: Optional task-specific instructions to include in the interpretation prompt
 
 ### Using the individual modules directly

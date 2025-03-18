@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=64.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hypothesaes"
+version = "0.0.5"
+authors = [
+    {name = "Rajiv Movva", email = "rmovva@berkeley.edu"},
+    {name = "Kenny Peng", email = "kennypeng@cs.cornell.edu"},
+]
+description = "Hypothesizing interpretable relationships in text datasets using sparse autoencoders."
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+# The dynamic dependencies will be read from requirements.txt
+dynamic = ["dependencies"]
+
+[project.urls]
+"Homepage" = "https://github.com/rmovva/HypotheSAEs"
+"Bug Tracker" = "https://github.com/rmovva/HypotheSAEs/issues"
+
+[tool.setuptools]
+packages = ["hypothesaes"]
+include-package-data = true
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]} 

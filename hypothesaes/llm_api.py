@@ -30,13 +30,27 @@ def get_client():
 def get_completion(
     prompt: str,
     model: str = "gpt-4o",
-    temperature: float = 0.0,
-    max_tokens: int = 1000,
-    timeout: float = 30.0,
+    timeout: float = 15.0,
     max_retries: int = 3,
-    backoff_factor: float = 3.0,
+    backoff_factor: float = 2.0,
+    **kwargs
 ) -> str:
-    """Get completion from OpenAI API with retry logic."""
+    """
+    Get completion from OpenAI API with retry logic and timeout.
+    
+    Args:
+        prompt: The prompt to send
+        model: Model to use
+        max_retries: Maximum number of retries on rate limit
+        backoff_factor: Factor to multiply backoff time by after each retry
+        request_timeout: Timeout for the request
+        **kwargs: Additional arguments to pass to the OpenAI API; max_tokens, temperature, etc.
+    Returns:
+        Generated completion text
+    
+    Raises:
+        Exception: If all retries fail
+    """
     client = get_client()
     model_id = model_abbrev_to_id.get(model, model)
     
@@ -45,9 +59,8 @@ def get_completion(
             response = client.chat.completions.create(
                 model=model_id,
                 messages=[{"role": "user", "content": prompt}],
-                temperature=temperature,
-                max_tokens=max_tokens,
-                timeout=timeout
+                timeout=timeout,
+                **kwargs
             )
             return response.choices[0].message.content
             

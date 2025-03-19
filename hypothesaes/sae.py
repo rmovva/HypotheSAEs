@@ -270,20 +270,32 @@ class SparseAutoencoder(nn.Module):
             
         return history
 
-    def get_activations(self, inputs):
-        """Get sparse activations for input data."""
+    def get_activations(self, inputs, batch_size=16384):
+        """Get sparse activations for input data with batching to prevent CUDA OOM.
+        
+        Args:
+            inputs: Input data as numpy array or torch tensor
+            batch_size: Number of samples per batch (default: 16384)
+        
+        Returns:
+            Numpy array of activations
+        """
         self.eval()
         
         if isinstance(inputs, np.ndarray):
             inputs = torch.from_numpy(inputs).float()
         
         inputs = inputs.to(device)
-        
+        num_samples = inputs.shape[0]
+        all_activations = []
         with torch.no_grad():
-            _, info = self(inputs)
-            activations = info['activations']
+            for i in tqdm(range(0, num_samples, batch_size), desc=f"Computing activations (batchsize={batch_size})"):
+                batch = inputs[i:i+batch_size]
+                _, info = self(batch)
+                batch_activations = info['activations']
+                all_activations.append(batch_activations.cpu())
         
-        return activations.cpu().numpy()
+        return torch.cat(all_activations, dim=0).numpy()
 
 def load_model(path: str) -> SparseAutoencoder:
     """Load a saved model from path."""

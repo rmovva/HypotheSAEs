@@ -8,6 +8,7 @@ wandb/*
 data/*
 *checkpoints*
 *cache*
+notebooks/testing_notebook.ipynb
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

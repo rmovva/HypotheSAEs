@@ -76,15 +76,21 @@ def sample_percentile_bins(
     if len(high_indices) >= n_per_class:
         high_sample_indices = np.random.choice(high_indices, size=n_per_class, replace=False)
     else:
-        print(f"Warning: There are less than {n_per_class} examples in {high_percentile} for neuron {neuron_idx}; using {len(high_indices)} instead")
+        print(f"Warning: There are less than {n_per_class} examples in bin {high_percentile} for neuron {neuron_idx}; using {len(high_indices)} instead")
         high_sample_indices = high_indices
     
     if low_percentile is not None:
         low_mask = (pos_vals >= np.percentile(pos_vals, low_percentile[0])) & \
                   (pos_vals <= np.percentile(pos_vals, low_percentile[1]))
         low_indices = pos_indices[low_mask]
-    else:
+    else: # Use examples with zero activation as the negative examples
         low_indices = np.where(neuron_acts == 0)[0]
+
+    if len(low_indices) >= n_per_class:
+        low_sample_indices = np.random.choice(low_indices, size=n_per_class, replace=False)
+    else:
+        print(f"Warning: There are less than {n_per_class} examples in bin {low_percentile} for neuron {neuron_idx}; using {len(low_indices)} instead")
+        low_sample_indices = low_indices
     
     low_sample_indices = np.random.choice(low_indices, size=n_per_class, replace=False)
     

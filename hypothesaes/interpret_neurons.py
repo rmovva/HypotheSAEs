@@ -92,8 +92,6 @@ def sample_percentile_bins(
         print(f"Warning: There are less than {n_per_class} examples in bin {low_percentile} for neuron {neuron_idx}; using {len(low_indices)} instead")
         low_sample_indices = low_indices
     
-    low_sample_indices = np.random.choice(low_indices, size=n_per_class, replace=False)
-    
     pos_texts = [texts[i] for i in high_sample_indices]
     neg_texts = [texts[i] for i in low_sample_indices]
     
@@ -187,10 +185,13 @@ class NeuronInterpreter:
         config: InterpretConfig,
     ) -> str:
         """Get and parse interpretation completion from LLM."""
-        prompt = prompt_template.format(
-            task_specific_instructions=config.task_specific_instructions,
-            **formatted_examples
-        )
+        try:
+            prompt = prompt_template.format(
+                task_specific_instructions=config.task_specific_instructions,
+                **formatted_examples
+            )
+        except KeyError as e:
+            raise KeyError(f"Missing required key {e} in the interpretation prompt template. Please ensure all required keys are provided in formatted_examples.")
         
         if self.interpreter_model.startswith('o'):
             response = get_completion(

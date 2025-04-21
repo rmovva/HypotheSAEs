@@ -139,7 +139,7 @@ class SamplingConfig:
     n_examples: int = 20 # Number of examples to sample to prompt the interpreter
     random_seed: Optional[int] = None # Random seed for example sampling
     max_words_per_example: Optional[int] = 256 # Maximum number of words per text example, truncated if necessary
-    extra_kwargs: Dict[str, Any] = field(default_factory=dict) # Extra keyword arguments for the sampling function
+    sampling_kwargs: Dict[str, Any] = field(default_factory=dict) # Extra keyword arguments for the sampling function
 
 @dataclass
 class LLMConfig:
@@ -237,7 +237,7 @@ class NeuronInterpreter:
             n_examples=config.sampling.n_examples,
             max_words_per_example=config.sampling.max_words_per_example,
             random_seed=config.sampling.random_seed,
-            **config.sampling.extra_kwargs
+            **config.sampling.sampling_kwargs
         )
         
         prompt_template = load_prompt(config.prompt_name)

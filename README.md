@@ -71,8 +71,8 @@ After generating hypotheses, you can test whether they generalize on a heldout s
 Clone the repo and install in editable mode. This will give you access to all of the example notebooks, which are helpful for getting started. You'll also be able to edit the code directly.
 
 ```bash
-git clone https://github.com/rmovva/hypothesaes.git
-cd hypothesaes
+git clone https://github.com/rmovva/HypotheSAEs.git
+cd HypotheSAEs
 pip install -e .
 ```
 

@@ -270,7 +270,7 @@ class SparseAutoencoder(nn.Module):
             
         return history
 
-    def get_activations(self, inputs, batch_size=16384):
+    def get_activations(self, inputs, batch_size=16384, show_progress=True):
         """Get sparse activations for input data with batching to prevent CUDA OOM.
         
         Args:
@@ -281,16 +281,27 @@ class SparseAutoencoder(nn.Module):
             Numpy array of activations
         """
         self.eval()
-        
-        if isinstance(inputs, np.ndarray):
+
+        if isinstance(inputs, list):
+            inputs = torch.tensor(inputs, dtype=torch.float)
+        elif isinstance(inputs, np.ndarray):
             inputs = torch.from_numpy(inputs).float()
+        elif not isinstance(inputs, torch.Tensor):
+            raise TypeError("inputs must be a list, numpy array, or torch tensor")
+        if not inputs.dtype == torch.float:
+            inputs = inputs.float()
         
-        inputs = inputs.to(device)
         num_samples = inputs.shape[0]
         all_activations = []
         with torch.no_grad():
-            for i in tqdm(range(0, num_samples, batch_size), desc=f"Computing activations (batchsize={batch_size})"):
+            if show_progress:
+                iterator = tqdm(range(0, num_samples, batch_size), desc=f"Computing activations (batchsize={batch_size})")
+            else:
+                iterator = range(0, num_samples, batch_size)
+                
+            for i in iterator:
                 batch = inputs[i:i+batch_size]
+                batch = batch.to(device)
                 _, info = self(batch)
                 batch_activations = info['activations']
                 all_activations.append(batch_activations.cpu())

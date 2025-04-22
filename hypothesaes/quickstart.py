@@ -209,8 +209,8 @@ def generate_hypotheses(
     labels: Union[List[int], List[float], np.ndarray],
     embeddings: Union[List, np.ndarray],
     sae: Union[SparseAutoencoder, List[SparseAutoencoder]],
-    cache_name: str,
     *,
+    cache_name: Optional[str] = None,
     classification: Optional[bool] = None,
     selection_method: str = "separation_score",
     n_selected_neurons: int = 20,
@@ -234,7 +234,7 @@ def generate_hypotheses(
         labels: Target labels (binary for classification, continuous for regression)
         embeddings: Pre-computed embeddings for the input texts (list or numpy array)
         sae: A single SAE or a list of SAEs
-        cache_name: String prefix for storing embedding/annotation caches
+        cache_name: Optional string prefix for caching annotations
         classification: Whether this is a classification task. If None, inferred from labels
         selection_method: Method for selecting predictive neurons ('separation_score', 'correlation', 'lasso')
         n_selected_neurons: Number of neurons to select and interpret
@@ -350,8 +350,8 @@ def evaluate_hypotheses(
     hypotheses_df: pd.DataFrame,
     texts: List[str],
     labels: Union[List[int], List[float], np.ndarray],
-    cache_name: str,
     *,
+    cache_name: Optional[str] = None,
     annotator_model: str = "gpt-4o-mini",
     max_words_per_example: int = 256,
     classification: Optional[bool] = None,
@@ -367,7 +367,7 @@ def evaluate_hypotheses(
         annotator_model: Model to use for annotation
         max_words_per_example: Maximum words per example for annotation
         classification: Whether this is a classification task. If None, inferred from labels
-        dataset_name: Name for caching
+        cache_name: Optional string prefix for storing annotation cache
         
     Returns:
         DataFrame with original columns plus evaluation metrics

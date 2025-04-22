@@ -31,9 +31,21 @@ def sample_top_zero(
     neuron_acts = activations[:, neuron_idx]
     n_per_class = n_examples // 2
     
-    top_indices = np.argsort(neuron_acts)[-n_per_class:]
+    # Get indices of positive activations and take top n_per_class (or fewer if not enough positive)
+    count_positive_activating = np.sum(neuron_acts > 0)
+    if count_positive_activating < n_per_class:
+        print(f"Warning: Only found {count_positive_activating} examples with positive activation, using all available")
+        top_indices = np.argsort(neuron_acts)[-count_positive_activating:]
+    else:
+        top_indices = np.argsort(neuron_acts)[-n_per_class:]
+    
+    # Get zero activation examples
     zero_indices = np.where(neuron_acts == 0)[0]
-    random_indices = np.random.choice(zero_indices, size=n_per_class, replace=False)
+    if len(zero_indices) >= n_per_class:
+        random_indices = np.random.choice(zero_indices, size=n_per_class, replace=False)
+    else:
+        print(f"Warning: Only found {len(zero_indices)} examples with zero activation, using all available")
+        random_indices = zero_indices
     
     pos_texts = [texts[i] for i in top_indices]
     neg_texts = [texts[i] for i in random_indices]

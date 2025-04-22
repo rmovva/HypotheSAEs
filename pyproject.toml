@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hypothesaes"
-version = "0.0.5"
+version = "0.1.0"
 authors = [
     {name = "Rajiv Movva", email = "rmovva@berkeley.edu"},
     {name = "Kenny Peng", email = "kennypeng@cs.cornell.edu"},
@@ -23,6 +23,7 @@ dynamic = ["dependencies"]
 [project.urls]
 "Homepage" = "https://github.com/rmovva/HypotheSAEs"
 "Bug Tracker" = "https://github.com/rmovva/HypotheSAEs/issues"
+"Changelog" = "https://github.com/rmovva/HypotheSAEs/blob/main/CHANGELOG.md"
 
 [tool.setuptools]
 packages = ["hypothesaes"]

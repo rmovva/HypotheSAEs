@@ -26,8 +26,8 @@ class SparseAutoencoder(nn.Module):
         self.input_dim = input_dim
         self.m_total_neurons = m_total_neurons
         self.k_active_neurons = k_active_neurons
-        self.aux_k = 2 * k_active_neurons if aux_k is None else aux_k
-        self.multi_k = 4 * k_active_neurons if multi_k is None else multi_k
+        self.aux_k = min(2 * k_active_neurons, m_total_neurons) if aux_k is None else aux_k
+        self.multi_k = min(4 * k_active_neurons, m_total_neurons) if multi_k is None else multi_k
         self.dead_neuron_threshold_steps = dead_neuron_threshold_steps
 
         # Core layers

@@ -107,7 +107,8 @@ def interpret_sae(
     interpret_temperature: float = 0.7,
     max_interpretation_tokens: int = 50,
     n_candidates: int = 1,
-    print_examples: int = 3,
+    print_examples_n: int = 3,
+    print_examples_max_chars: int = 1024,
     task_specific_instructions: Optional[str] = None,
 ) -> Dict:
     """Interpret neurons in a Sparse Autoencoder.
@@ -125,7 +126,8 @@ def interpret_sae(
         temperature: Temperature for LLM generation
         max_interpretation_tokens: Maximum tokens for interpretation
         n_candidates: Number of candidate interpretations per neuron
-        print_examples: Number of top activating examples to print (0 to disable)
+        print_examples_n: Number of top activating examples to print (0 to disable)
+        print_examples_max_chars: Maximum characters per example to print (None to print full text)
         task_specific_instructions: Optional task-specific instructions to include in the interpretation prompt
         
     Returns:
@@ -188,13 +190,13 @@ def interpret_sae(
             "interpretation": interpretations[idx][0] if n_candidates == 1 else interpretations[idx]
         }
         
-        if print_examples > 0:
-            top_indices = np.argsort(neuron_activations)[-print_examples:][::-1]
+        if print_examples_n > 0:
+            top_indices = np.argsort(neuron_activations)[-print_examples_n:][::-1]
             top_examples = [texts[i] for i in top_indices]
             print(f"\nNeuron {idx} (from SAE M={neuron_source_sae_info[idx][0]}, K={neuron_source_sae_info[idx][1]}): {interpretations[idx][0]}")
             print(f"\nTop activating examples:")
             for i, example in enumerate(top_examples, 1):
-                print(f"{i}. {get_text_for_printing(example, max_chars=256)}...")
+                print(f"{i}. {get_text_for_printing(example, max_chars=print_examples_max_chars)}...")
                 result_dict[f"top_example_{i}"] = example
             print("-"*100)
                 

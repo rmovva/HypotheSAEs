@@ -316,7 +316,7 @@ def load_model(path: str) -> SparseAutoencoder:
     print(f"Loaded model from {path}")
     return model
 
-def get_multiple_sae_activations(sae_list, X, return_neuron_source_info=False):
+def get_multiple_sae_activations(sae_list, X, return_neuron_source_info=False, **kwargs):
     if not isinstance(sae_list, list):
         sae_list = [sae_list]
     if not isinstance(X, torch.Tensor):
@@ -325,7 +325,7 @@ def get_multiple_sae_activations(sae_list, X, return_neuron_source_info=False):
     activations_list = []
     neuron_source_sae_info = []
     for s in sae_list:
-        activations_list.append(s.get_activations(X))
+        activations_list.append(s.get_activations(X, **kwargs))
         neuron_source_sae_info += [(s.m_total_neurons, s.k_active_neurons)] * s.m_total_neurons
     activations = np.concatenate(activations_list, axis=1)
     

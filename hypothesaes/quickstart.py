@@ -146,7 +146,7 @@ def interpret_sae(
     
     # Get activations from SAE(s)
     activations, neuron_source_sae_info = get_multiple_sae_activations(sae, X, return_neuron_source_info=True)
-    print(f"Activations shape (from {len(sae)} SAEs): {activations.shape}")
+    print(f"Activations shape: {activations.shape}")
     
     # Select neurons to interpret
     if neuron_indices is None:
@@ -262,7 +262,7 @@ def generate_hypotheses(
 
     # Get activations from SAE(s)
     activations, neuron_source_sae_info = get_multiple_sae_activations(sae, X, return_neuron_source_info=True)
-    print(f"Activations shape (from {len(sae)} SAEs): {activations.shape}")
+    print(f"Activations shape: {activations.shape}")
 
     print(f"\nStep 1: Selecting top {n_selected_neurons} predictive neurons")
     if n_selected_neurons > activations.shape[1]:

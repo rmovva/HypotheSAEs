@@ -7,7 +7,7 @@ import torch
 import os
 from pathlib import Path
 
-from .sae import SparseAutoencoder, load_model
+from .sae import SparseAutoencoder, load_model, get_multiple_sae_activations
 from .select_neurons import select_neurons
 from .interpret_neurons import NeuronInterpreter, InterpretConfig, ScoringConfig, LLMConfig, SamplingConfig
 from .utils import get_text_for_printing
@@ -60,8 +60,8 @@ def train_sae(
     embeddings = np.array(embeddings)
     input_dim = embeddings.shape[1]
     
-    X = torch.tensor(embeddings, dtype=torch.float32).to(device)
-    X_val = torch.tensor(val_embeddings, dtype=torch.float32).to(device) if val_embeddings is not None else None
+    X = torch.tensor(embeddings, dtype=torch.float)
+    X_val = torch.tensor(val_embeddings, dtype=torch.float) if val_embeddings is not None else None
     
     if checkpoint_dir is not None:
         os.makedirs(checkpoint_dir, exist_ok=True)
@@ -137,21 +137,13 @@ def interpret_sae(
     if neuron_indices is not None and n_random_neurons is not None:
         raise ValueError("Only one of neuron_indices or n_random_neurons should be provided")
     
-    embeddings = np.array(embeddings)
-    X = torch.tensor(embeddings, dtype=torch.float32).to(device)
-    
-    # Convert single SAE to list for consistent handling
-    if not isinstance(sae, list):
-        sae = [sae]
+    if not isinstance(embeddings, torch.Tensor):
+        X = torch.tensor(embeddings, dtype=torch.float)
+    else:
+        X = embeddings
     
     # Get activations from SAE(s)
-    activations_list = []
-    neuron_source_sae_info = []
-    for s in sae:
-        activations_list.append(s.get_activations(X))
-        neuron_source_sae_info += [(s.m_total_neurons, s.k_active_neurons)] * s.m_total_neurons
-    activations = np.concatenate(activations_list, axis=1)
-    
+    activations, neuron_source_sae_info = get_multiple_sae_activations(sae, X, return_neuron_source_info=True)
     print(f"Activations shape (from {len(sae)} SAEs): {activations.shape}")
     
     # Select neurons to interpret
@@ -256,26 +248,18 @@ def generate_hypotheses(
     """
     
     labels = np.array(labels)
-    embeddings = np.array(embeddings)
-    X = torch.tensor(embeddings, dtype=torch.float32).to(device)
+    if not isinstance(embeddings, torch.Tensor):
+        X = torch.tensor(embeddings, dtype=torch.float)
+    else:
+        X = embeddings
     
     if classification is None:
         classification = np.all(np.isin(np.random.choice(labels, size=1000, replace=True), [0, 1]))
     
     print(f"Embeddings shape: {embeddings.shape}")
 
-    # Convert single SAE to list for consistent handling
-    if not isinstance(sae, list):
-        sae = [sae]
-    
     # Get activations from SAE(s)
-    activations_list = []
-    neuron_source_sae_info = []
-    for s in sae:
-        activations_list.append(s.get_activations(X))
-        neuron_source_sae_info += [(s.m_total_neurons, s.k_active_neurons)] * s.m_total_neurons
-    activations = np.concatenate(activations_list, axis=1)
-    
+    activations, neuron_source_sae_info = get_multiple_sae_activations(sae, X, return_neuron_source_info=True)
     print(f"Activations shape (from {len(sae)} SAEs): {activations.shape}")
 
     print(f"\nStep 1: Selecting top {n_selected_neurons} predictive neurons")

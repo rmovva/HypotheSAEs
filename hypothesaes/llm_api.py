@@ -7,7 +7,7 @@ import openai
 """
 These model IDs point to the latest versions of the models as of 2025-03-12.
 We point to a specific version for reproducibility, but feel free to update them as necessary.
-Note that o1, o1-mini, o3-mini are also supported by get_completion().
+Note that o-series models (o1, o1-mini, o3-mini) are also supported by get_completion().
 We don't point these models to a specific version, so passing in these model names will use the latest version.
 """
 model_abbrev_to_id = {
@@ -43,7 +43,7 @@ def get_completion(
         model: Model to use
         max_retries: Maximum number of retries on rate limit
         backoff_factor: Factor to multiply backoff time by after each retry
-        request_timeout: Timeout for the request
+        timeout: Timeout for the request
         **kwargs: Additional arguments to pass to the OpenAI API; max_tokens, temperature, etc.
     Returns:
         Generated completion text
@@ -64,11 +64,11 @@ def get_completion(
             )
             return response.choices[0].message.content
             
-        except Exception as e:
+        except (openai.RateLimitError, openai.APITimeoutError) as e:
             if attempt == max_retries - 1:  # Last attempt
                 raise e
             
-            # Exponential backoff
             wait_time = timeout * (backoff_factor ** attempt)
-            print(f"API timeout, retrying in {wait_time:.1f}s... ({attempt + 1}/{max_retries})")
+            if attempt > 0:
+                print(f"API error: {e}; retrying in {wait_time:.1f}s... ({attempt + 1}/{max_retries})")
             time.sleep(wait_time)

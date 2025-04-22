@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 import glob
 import torch
-
+import openai
 from .utils import filter_invalid_texts
 
 # Use environment variable for cache dir if set, otherwise use default
@@ -47,13 +47,13 @@ def _embed_batch_openai(
             )
             return [data.embedding for data in response.data]
             
-        except Exception as e:
+        except (openai.RateLimitError, openai.APITimeoutError) as e:
             if attempt == max_retries - 1:  # Last attempt
                 raise e
             
-            # Exponential backoff
-            wait_time = (timeout * (backoff_factor ** attempt))
-            print(f"API timeout, retrying in {wait_time:.1f}s... ({attempt + 1}/{max_retries})")
+            wait_time = timeout * (backoff_factor ** attempt)
+            if attempt > 0:
+                print(f"API error: {e}; retrying in {wait_time:.1f}s... ({attempt + 1}/{max_retries})")
             time.sleep(wait_time)
 
 

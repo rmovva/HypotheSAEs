@@ -52,10 +52,13 @@ class SparseAutoencoder(nn.Module):
             Number of active neurons selected per example.
         aux_k : int | None, optional
             Upper bound on the number of dead neurons to try for auxiliary residual prediction.
+            The default value, set during initialization, is `2 * k_active_neurons`.
+            The default coefficient on the auxiliary loss is 1/32 (see `compute_loss`).
         multi_k : int | None, optional
             How many neurons to use for the less‑sparse multi‑K reconstruction
-            term.  The default weight on this loss is 0. If *None* it defaults to 
-            `4 * k_active_neurons` (capped at `m_total_neurons`).
+            term.  The default weight on this loss is 0, and the default value
+            is None (i.e. no multi‑K reconstruction).  If using, a recommend starting 
+            value is `4 * k_active_neurons`.
         dead_neuron_threshold_steps : int, optional
             Steps of non‑activation after which a neuron counts as *dead*.
         prefix_group_sizes : list[int] | None, optional

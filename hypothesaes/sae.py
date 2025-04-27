@@ -80,15 +80,14 @@ class SparseAutoencoder(nn.Module):
         self.dead_neuron_threshold_steps = dead_neuron_threshold_steps
 
         # Matryoshka prefixes as full lengths --------------------------------
-        if prefix_lengths is None:
-            prefix_lengths = [m_total_neurons]
-        assert (
-            prefix_lengths[-1] == m_total_neurons
-        ), "Last prefix length must equal m_total_neurons"
-        assert all(
-            x > y for x, y in zip(prefix_lengths[1:], prefix_lengths[:-1])
-        ), "Each prefix length must be greater than the previous one"
         self.prefix_lengths = prefix_lengths
+        if self.prefix_lengths is not None:
+            assert (
+                self.prefix_lengths[-1] == m_total_neurons
+            ), "Last prefix length must equal m_total_neurons"
+            assert all(
+                x > y for x, y in zip(self.prefix_lengths[1:], self.prefix_lengths[:-1])
+            ), "Each prefix length must be greater than the previous one"
 
         # weight initialization --------------------------------------------------------------
         self.encoder = nn.Linear(input_dim, m_total_neurons, bias=False)
@@ -181,7 +180,7 @@ class SparseAutoencoder(nn.Module):
 
         activ = info["activations"]
         # main L2 -----------------------------------------------------------
-        if len(self.prefix_lengths) == 1:
+        if self.prefix_lengths is None or len(self.prefix_lengths) == 1:
             main_l2 = self._normalized_mse(recon, x)
         else:
             l2_terms = []
@@ -399,9 +398,9 @@ def get_sae_checkpoint_name(m_total_neurons, k_active_neurons, prefix_lengths=No
 
 def load_model(path: str) -> SparseAutoencoder:
     ckpt = torch.load(path, pickle_module=pickle)
-    model = SparseAutoencoder(**ckpt["config"])
+    model = SparseAutoencoder(**ckpt["config"]).to(device)
     model.load_state_dict(ckpt["state_dict"])
-    print(f"Loaded model from {path}")
+    print(f"Loaded model from {path} onto device {device}")
     return model
 
 def get_multiple_sae_activations(sae_list, X, return_neuron_source_info=False, **kwargs):

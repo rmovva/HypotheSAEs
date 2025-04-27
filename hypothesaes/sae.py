@@ -38,7 +38,7 @@ class SparseAutoencoder(nn.Module):
         aux_k: Optional[int] = None,
         multi_k: Optional[int] = None,
         dead_neuron_threshold_steps: int = 256,
-        prefix_group_sizes: Optional[List[int]] = None,
+        prefix_lengths: Optional[List[int]] = None,
     ) -> None:
         """Create a top-K sparse autoencoder.
 
@@ -61,9 +61,9 @@ class SparseAutoencoder(nn.Module):
             value is `4 * k_active_neurons`.
         dead_neuron_threshold_steps : int, optional
             Steps of non‑activation after which a neuron counts as *dead*.
-        prefix_group_sizes : list[int] | None, optional
-            If given (e.g. `[16, 48]`), activates *Matryoshka* loss: the first
-            prefix has 16 neurons, the second another 48, etc.  If *None*, all
+        prefix_lengths : list[int] | None, optional
+            If given (e.g. `[16, 64]`), activates *Matryoshka* loss: the first
+            prefix has 16 neurons, the second 64, etc.  If *None*, all
             M neurons are treated equally.
         """
 
@@ -79,15 +79,16 @@ class SparseAutoencoder(nn.Module):
         self.multi_k = multi_k
         self.dead_neuron_threshold_steps = dead_neuron_threshold_steps
 
-        # Matryoshka groups ----------------------------------------------------
-        if prefix_group_sizes is None:
-            prefix_group_sizes = [m_total_neurons]
+        # Matryoshka prefixes as full lengths --------------------------------
+        if prefix_lengths is None:
+            prefix_lengths = [m_total_neurons]
         assert (
-            sum(prefix_group_sizes) == m_total_neurons
-        ), "sum(prefix_group_sizes) must equal m_total_neurons"
-        self.prefix_group_sizes = prefix_group_sizes
-        # Index boundaries for each Matryoshka prefix
-        self.prefix_boundaries = torch.tensor(np.cumsum(prefix_group_sizes), device=device)
+            prefix_lengths[-1] == m_total_neurons
+        ), "Last prefix length must equal m_total_neurons"
+        assert all(
+            x > y for x, y in zip(prefix_lengths[1:], prefix_lengths[:-1])
+        ), "Each prefix length must be greater than the previous one"
+        self.prefix_lengths = prefix_lengths
 
         # weight initialization --------------------------------------------------------------
         self.encoder = nn.Linear(input_dim, m_total_neurons, bias=False)
@@ -171,7 +172,7 @@ class SparseAutoencoder(nn.Module):
     ) -> torch.Tensor:
         """Return total loss (Matryoshka L2 + optional multi‑K + aux).
 
-        If `len(prefix_group_sizes)==1` there is no Matryoshka nesting.
+        If `len(prefix_lengths)==1` there is no Matryoshka nesting.
         Otherwise we average the L2 of every prefix reconstruction as in
         Bussmann et al. (2025).
 
@@ -180,12 +181,12 @@ class SparseAutoencoder(nn.Module):
 
         activ = info["activations"]
         # main L2 -----------------------------------------------------------
-        if len(self.prefix_group_sizes) == 1:
+        if len(self.prefix_lengths) == 1:
             main_l2 = self._normalized_mse(recon, x)
         else:
             l2_terms = []
             dec_weight = self.decoder.weight  # (input_dim, m_total_neurons)
-            for end in self.prefix_boundaries:  # skip leading 0
+            for end in self.prefix_lengths:
                 # activ[:, :end] is (batchsize, end);  dec_weight[:, :end] is (input_dim, end)
                 prefix_recon = activ[:, :end] @ dec_weight[:, :end].t() + self.input_bias
                 l2_terms.append(self._normalized_mse(prefix_recon, x))
@@ -237,7 +238,7 @@ class SparseAutoencoder(nn.Module):
             "aux_k": self.aux_k,
             "multi_k": self.multi_k,
             "dead_neuron_threshold_steps": self.dead_neuron_threshold_steps,
-            "prefix_group_sizes": self.prefix_group_sizes,
+            "prefix_lengths": self.prefix_lengths,
         }
         torch.save({"config": config, "state_dict": self.state_dict()}, save_path, pickle_module=pickle)
         print(f"Saved model to {save_path}")
@@ -340,7 +341,7 @@ class SparseAutoencoder(nn.Module):
         # Save final model
         if save_dir is not None:
             os.makedirs(save_dir, exist_ok=True)
-            filename = get_sae_checkpoint_name(self.m_total_neurons, self.k_active_neurons, self.prefix_group_sizes)
+            filename = get_sae_checkpoint_name(self.m_total_neurons, self.k_active_neurons, self.prefix_lengths)
             self.save(os.path.join(save_dir, filename))
             
         return history
@@ -389,12 +390,12 @@ class SparseAutoencoder(nn.Module):
 # -----------------------------------------------------------------------------
 # Additional utils
 # -----------------------------------------------------------------------------
-def get_sae_checkpoint_name(m_total_neurons, k_active_neurons, prefix_group_sizes=None):
-    if prefix_group_sizes is None:
+def get_sae_checkpoint_name(m_total_neurons, k_active_neurons, prefix_lengths=None):
+    if prefix_lengths is None:
         return f'SAE_M={m_total_neurons}_K={k_active_neurons}.pt'
     else:
-        group_str = "-".join(str(g) for g in prefix_group_sizes)
-        return f'SAE_matryoshka_M={m_total_neurons}_K={k_active_neurons}_groups={group_str}.pt'
+        prefix_str = "-".join(str(g) for g in prefix_lengths)
+        return f'SAE_matryoshka_M={m_total_neurons}_K={k_active_neurons}_prefixes={prefix_str}.pt'
 
 def load_model(path: str) -> SparseAutoencoder:
     ckpt = torch.load(path, pickle_module=pickle)

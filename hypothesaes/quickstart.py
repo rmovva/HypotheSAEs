@@ -7,20 +7,20 @@ import torch
 import os
 from pathlib import Path
 
-from .sae import SparseAutoencoder, load_model, get_multiple_sae_activations
+from .sae import SparseAutoencoder, load_model, get_multiple_sae_activations, get_sae_checkpoint_name
 from .select_neurons import select_neurons
 from .interpret_neurons import NeuronInterpreter, InterpretConfig, ScoringConfig, LLMConfig, SamplingConfig
 from .utils import get_text_for_printing
 from .annotate import annotate_texts_with_concepts
 from .evaluation import score_hypotheses
 BASE_DIR = Path(__file__).parent.parent
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def train_sae(
     embeddings: Union[List, np.ndarray],
     M: int,
     K: int,
     *,
+    matryoshka_prefix_lengths: Optional[List[int]] = None,
     checkpoint_dir: Optional[str] = None,
     overwrite_checkpoint: bool = False,
     val_embeddings: Optional[Union[List, np.ndarray]] = None,
@@ -34,6 +34,7 @@ def train_sae(
     multi_coef: float = 0.0,
     patience: int = 3,
     clip_grad: float = 1.0,
+    show_progress: bool = True,
 ) -> SparseAutoencoder:
     """Train a Sparse Autoencoder or load an existing one.
     
@@ -41,7 +42,9 @@ def train_sae(
         embeddings: Pre-computed embeddings for training (list or numpy array)
         M: Number of neurons in SAE
         K: Number of top-activating neurons to keep per forward pass
+        matryoshka_prefix_lengths: List of prefix lengths for Matryoshka loss (None for vanilla SAE)
         checkpoint_dir: Optional directory for storing/loading SAE checkpoints
+        overwrite_checkpoint: Whether to overwrite existing checkpoints
         val_embeddings: Optional validation embeddings for early stopping during SAE training
         aux_k: Number of neurons to consider for dead neuron revival
         multi_k: Number of neurons for secondary reconstruction
@@ -53,6 +56,7 @@ def train_sae(
         multi_coef: Coefficient for multi-k loss
         patience: Early stopping patience
         clip_grad: Gradient clipping value
+        show_progress: Whether to show training progress bar
         
     Returns:
         Trained SparseAutoencoder model
@@ -65,9 +69,10 @@ def train_sae(
     
     if checkpoint_dir is not None:
         os.makedirs(checkpoint_dir, exist_ok=True)
-        checkpoint_path = os.path.join(checkpoint_dir, f"SAE_M={M}_K={K}.pt")
+        checkpoint_name = get_sae_checkpoint_name(M, K, matryoshka_prefix_lengths)
+        checkpoint_path = os.path.join(checkpoint_dir, checkpoint_name)
         if os.path.exists(checkpoint_path) and not overwrite_checkpoint:
-            return load_model(checkpoint_path).to(device)
+            return load_model(checkpoint_path)
     
     sae = SparseAutoencoder(
         input_dim=input_dim,
@@ -76,7 +81,8 @@ def train_sae(
         aux_k=aux_k,
         multi_k=multi_k,
         dead_neuron_threshold_steps=dead_neuron_threshold_steps,
-    ).to(device)
+        prefix_lengths=matryoshka_prefix_lengths,
+    )
     
     sae.fit(
         X_train=X,
@@ -89,6 +95,7 @@ def train_sae(
         multi_coef=multi_coef,
         patience=patience,
         clip_grad=clip_grad,
+        show_progress=show_progress,
     )
 
     return sae

@@ -210,7 +210,7 @@ Less important:
 
 5. **Scoring interpretation fidelity**: Sometimes, the LLM interpretation of a neuron will not actually summarize the neuron's activation pattern. One strategy to mitigate this issue is to generate 3 candidate interpretations per neuron, score each one, and use the top-scoring one. You can do this by setting `n_candidate_interpretations=3` in `generate_hypotheses()`. Scoring works by using a separate annotator LLM (default `gpt-4o-mini`) to annotate several top-activating and zero-activating examples according to the interpretation, and then computing F1-score (you can also choose to select based on precision, recall, or correlation instead).
 
-### 1. Choosing SAE parameters: M and K
+### 1. Choosing SAE hyperparameters (M, K, Matryoshka prefixes)
 
 The SAE parameters `M` and `K` control the granularity of concepts learned by the model:
 - `M` is the total number of concepts that can be learned across the dataset
@@ -218,6 +218,7 @@ The SAE parameters `M` and `K` control the granularity of concepts learned by th
 
 Increasing either parameter yields more granular features. For example, with small values like `(M=16, K=4)`, a neuron for Yelp reviews might learn to detect mentions of "price". With larger values like `(M=32, K=4)`, separate neurons might learn to distinguish between "high prices" vs "low prices".
 
+#### Vanilla Top-K SAEs
 Rules of thumb for choosing `(M, K)` based on dataset size:
 - `(M=64, K=4)` for ~1,000 examples
 - `(M=256, K=8)` for ~10,000 examples  
@@ -225,7 +226,28 @@ Rules of thumb for choosing `(M, K)` based on dataset size:
 
 Larger datasets often warrant larger values of `M`. In contrast, `K` should scale with the size / complexity of the individual texts. Values of 1-32 typically work well for `K`; larger values may only be necessary for very long documents (which you should consider splitting into chunks, anyway).
 
-### 2 . Caching embeddings, model checkpoints, and LLM annotations for reuse
+#### Matryoshka Top-K SAEs
+Alternatively, you can train a single SAE that simultaneously learns features at multiple granularities by specifying prefix lengths. In this case, the model is trained to reconstruct the input at multiple scales (using the first $M_1$ neurons, then $M_2 > M_1$ neurons, etc.). For example:
+
+```python
+sae = train_sae(
+    embeddings=embeddings,
+    M=1024,
+    K=8,
+    matryoshka_prefix_lengths=[64, 256, 1024], 
+)
+```
+
+This will train an SAE where there are three loss terms which are averaged: 
+- Reconstruction loss using the first 64 neurons
+- Reconstruction loss using the first 256 neurons
+- Reconstruction loss using all 1024 neurons (note that the final value of matryoshka_prefix_lengths must be equal to M)
+
+This approach helps avoid the common issue where larger SAEs end up splitting high-level features into several more granular features. See [Bussmann et al. (2025)](https://arxiv.org/abs/2503.17547) for more details about Matryoshka SAEs.
+
+Note: The results presented in our paper used vanilla Top-K SAEs; we haven't thoroughly tested Matryoshka Top-K SAEs yet.
+
+### 2. Caching embeddings, model checkpoints, and LLM annotations for reuse
 
 By default, the library uses caching to avoid redundant computation:
 
@@ -302,7 +324,7 @@ If you would like to run the method on a pairwise dataset, see how we generate r
 
 #### Training SAE and getting activations (``sae.py``)
 
-Train Sparse Autoencoders given train text embeddings, M, and K. You can also provide validation embeddings, which are used for early stopping (if validation reconstruction loss does not decrease for a specified number of epochs).
+Train Sparse Autoencoders given train text embeddings, M, and K. You can also provide validation embeddings for early stopping.
 ```python
 from hypothesaes.sae import SparseAutoencoder, load_model
 

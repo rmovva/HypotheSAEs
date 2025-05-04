@@ -2,6 +2,14 @@
 
 New version releases for HypotheSAEs will be documented here.
 
+## [0.2.0] - 2025-05-03
+
+### Added
+- Matryoshka SAEs: https://github.com/rmovva/HypotheSAEs/pull/1
+
+### Fixed
+- Account for the changed parameter name `print_examples_n` in `quickstart.interpret_sae()` (from `print_examples`) in the `quickstart.ipynb` notebook.
+
 ## [0.1.0] - 2025-04-22
 
 ### Added

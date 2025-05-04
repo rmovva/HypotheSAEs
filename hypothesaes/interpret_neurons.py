@@ -312,15 +312,31 @@ class NeuronInterpreter:
         labels: np.ndarray,
         activations: np.ndarray
     ) -> Dict[str, float]:
-        """Compute evaluation metrics for a single interpretation."""
+        """Compute evaluation metrics for a single interpretation.
+        
+        Args:
+            annotations: Annotations computed by an LLM by applying a neuron's natural language interpretation to a set of examples
+            labels: Binarized neuron activations (e.g. by setting the top-N activations to 1 and the zero-activations to 0) for the scored examples
+            activations: Continuous neuron activations for the scored examples
+            
+        Returns:
+            A dictionary containing the recall, precision, F1 score, and correlation for the interpretation
+        """
+        if not (1 in labels and 0 in labels):
+            return {"recall": 0.0, "precision": 0.0, "f1": 0.0, "correlation": 0.0}
+            
         true_pos = np.mean(annotations[labels == 1])
         false_pos = np.mean(annotations[labels == 0])
+        precision = 1 - false_pos
+        
+        f1 = 2 * true_pos * precision / (true_pos + precision) if (true_pos + precision) > 0 else 0.0
+        correlation = np.corrcoef(activations, annotations)[0,1] if len(np.unique(annotations)) > 1 else 0.0
         
         return {
             "recall": true_pos,
-            "precision": 1 - false_pos,
-            "f1": 2 * true_pos * (1 - false_pos) / (true_pos + (1 - false_pos)),
-            "correlation": np.corrcoef(activations, annotations)[0,1]
+            "precision": precision,
+            "f1": f1,
+            "correlation": correlation
         }
 
     def score_interpretations(

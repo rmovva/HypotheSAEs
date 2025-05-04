@@ -5,18 +5,30 @@ import time
 import openai
 
 """
-These model IDs point to the latest versions of the models as of 2025-03-12.
+These model IDs point to the latest versions of the models as of 2025-05-04.
 We point to a specific version for reproducibility, but feel free to update them as necessary.
 Note that o-series models (o1, o1-mini, o3-mini) are also supported by get_completion().
 We don't point these models to a specific version, so passing in these model names will use the latest version.
+
+2025-05-04:
+- Removed gpt-4 (deprecated by gpt-4o, will be removed from API soon)
+- Added gpt-4.1 models (not used by HypotheSAEs paper, but potentially of interest)
+
+2025-03-12:
+- First version of this file: supports gpt-4o, gpt-4o-mini, gpt-4
 """
 model_abbrev_to_id = {
-    'gpt4': 'gpt-4-0125-preview',
-    'gpt-4': 'gpt-4-0125-preview',
     'gpt4o': 'gpt-4o-2024-11-20',
     'gpt-4o': 'gpt-4o-2024-11-20',
     'gpt4o-mini': 'gpt-4o-mini-2024-07-18',
     'gpt-4o-mini': 'gpt-4o-mini-2024-07-18',
+
+    "gpt4.1": "gpt-4.1-2025-04-14",
+    "gpt-4.1": "gpt-4.1-2025-04-14",
+    "gpt4.1-mini": "gpt-4.1-mini-2025-04-14",
+    "gpt-4.1-mini": "gpt-4.1-mini-2025-04-14",
+    "gpt4.1-nano": "gpt-4.1-nano-2025-04-14",
+    "gpt-4.1-nano": "gpt-4.1-nano-2025-04-14",
 }
 
 def get_client():

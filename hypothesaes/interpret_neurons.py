@@ -242,6 +242,10 @@ class NeuronInterpreter:
         config: InterpretConfig
     ) -> str:
         """Generate interpretation for a single neuron."""
+        if np.all(activations[:, neuron_idx] <= 0):
+            print(f"Warning: All activations for neuron {neuron_idx} are <= 0. This neuron may be dead. Skipping interpretation.")
+            return None
+
         formatted_examples = config.sampling.function(
             texts=texts,
             activations=activations,

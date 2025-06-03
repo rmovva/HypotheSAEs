@@ -203,7 +203,7 @@ def interpret_sae(
             print(f"\nNeuron {idx} (from SAE M={neuron_source_sae_info[idx][0]}, K={neuron_source_sae_info[idx][1]}): {interpretations[idx][0]}")
             print(f"\nTop activating examples:")
             for i, example in enumerate(top_examples, 1):
-                print(f"{i}. {get_text_for_printing(example, max_chars=print_examples_max_chars)}...")
+                print(f"{i}. {get_text_for_printing(example, max_chars=print_examples_max_chars)}")
                 result_dict[f"top_example_{i}"] = example
             print("-"*100)
                 

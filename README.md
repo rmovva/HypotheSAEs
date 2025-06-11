@@ -1,5 +1,10 @@
 # HypotheSAEs: Sparse Autoencoders for Hypothesis Generation
 
+[![pypi](https://img.shields.io/pypi/v/hypothesaes?color=blue)](https://pypi.org/project/hypothesaes/)
+[![arXiv](https://img.shields.io/badge/arXiv-2502.04382-b31b1b)](https://arxiv.org/abs/2502.04382)
+[![website](https://img.shields.io/badge/website-hypothesaes.org-brightgreen)](https://hypothesaes.org)
+[![license](https://img.shields.io/github/license/rmovva/hypothesaes)](https://github.com/rmovva/hypothesaes/blob/main/LICENSE)
+
 HypotheSAEs is a method which produces interpretable relationships ("hypotheses") in text datasets explaining how input texts are related to a target variable. 
 For example, we can use HypotheSAEs to hypothesize concepts that explain which news headlines receive engagement, or whether a congressional speech was given by a Republican or Democrat speaker. 
 The method works by training Sparse Autoencoders (SAEs) on expressive representations of input texts, and then interpreting predictive neurons learned by the SAE.

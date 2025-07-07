@@ -6,7 +6,7 @@ openai
 pandas
 pytest
 scikit-learn
-scipy
+scipy==1.15.3
 sentence-transformers
 statsmodels
 tiktoken

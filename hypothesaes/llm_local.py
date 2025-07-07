@@ -1,8 +1,14 @@
 """Local LLM utilities for HypotheSAEs."""
 
-from typing import List
+from typing import List, Optional
 import torch
+torch.set_float32_matmul_precision("high")
+
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
+from transformers.pipelines.pt_utils import KeyDataset
+from datasets import Dataset
+
+from tqdm.auto import tqdm
 
 _LOCAL_PIPES = {}
 
@@ -30,6 +36,7 @@ def _get_pipeline(model: str):
         if pipe.tokenizer.pad_token is None:
             pipe.tokenizer.pad_token = pipe.tokenizer.eos_token
         _LOCAL_PIPES[model] = pipe
+        print(f"Loaded {model}, using {pipe.device} and precision {pipe.model.dtype}")
     return pipe
 
 
@@ -39,18 +46,33 @@ def get_local_completions(
     batch_size: int = 4,
     max_new_tokens: int = 128,
     temperature: float = 0.7,
+    show_progress: bool = True,
+    progress_desc: Optional[str] = None,
 ) -> List[str]:
-    """Generate completions for a list of prompts using a local model."""
+    """Generate completions for a list of prompts using a local model.
+    
+    Args:
+        prompts: Prompts to complete.
+        model: HF model ID or local name registered with `_get_pipeline`.
+        batch_size: Batch size given to the HF pipeline.
+        max_new_tokens: Max tokens to generate per prompt.
+        temperature: Sampling temperature (0 ⇒ greedy).
+        show_progress: If True, wrap generation in a tqdm progress bar.
+        progress_desc: Label shown in the progress bar, if enabled.
+    """
     pipe = _get_pipeline(model)
-    completions = []
-    for i in range(0, len(prompts), batch_size):
-        batch = prompts[i : i + batch_size]
-        outputs = pipe(
-            batch,
-            max_new_tokens=max_new_tokens,
-            do_sample=temperature > 0,
-            temperature=temperature,
-            batch_size=len(batch),
-        )
-        completions.extend([out[0]["generated_text"] for out in outputs])
-    return completions
+    ds   = Dataset.from_dict({"text": prompts})
+    
+    generator = pipe(
+        KeyDataset(ds, "text"),
+        batch_size=batch_size,
+        max_new_tokens=max_new_tokens,
+        do_sample=temperature > 0,
+        temperature=temperature if temperature > 0 else None,
+    )
+
+    if show_progress:
+        generator = tqdm(generator, total=len(prompts), desc=progress_desc)
+
+    return [item[0]["generated_text"] for item in generator]
+

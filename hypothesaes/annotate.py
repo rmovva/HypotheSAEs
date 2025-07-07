@@ -148,36 +148,37 @@ def _local_annotate(
     temperature: float = 0.0,
     model: str = "google/gemma-2-2b-it",
 ) -> None:
-    prompts = []
-    mapping = []
+    """Annotate (text, concept) tasks with a local HF model, using a single
+    call to `get_local_completions`.
+    """
+    # Collect annotation prompts and truncate any texts if necessary
+    prompts, mapping = [], []
     prompt_template = load_prompt("annotate")
     for text, concept in tasks:
         if max_words_per_example:
             text = truncate_text(text, max_words_per_example)
-        prompt = prompt_template.format(hypothesis=concept, text=text)
-        prompts.append(prompt)
+        prompts.append(prompt_template.format(hypothesis=concept, text=text))
         mapping.append((text, concept))
 
-    completions = []
-    iterator = range(0, len(prompts), batch_size)
-    if show_progress:
-        total = (len(prompts) + batch_size - 1) // batch_size
-        iterator = tqdm(iterator, desc=progress_desc, total=total)
-    for i in iterator:
-        batch_prompts = prompts[i : i + batch_size]
-        completions.extend(
-            get_local_completions(
-                batch_prompts,
-                model=model,
-                batch_size=len(batch_prompts),
-                max_new_tokens=1,
-                temperature=temperature,
-            )
-        )
+    # Get annotation completions with local LLM
+    completions = get_local_completions(
+        prompts,
+        model=model,
+        batch_size=batch_size,
+        max_new_tokens=1,
+        temperature=temperature,
+        show_progress=show_progress,
+        progress_desc=progress_desc,
+    )
 
+    # Parse completions, update results & cache
     for (text, concept), completion in zip(mapping, completions):
         response_text = completion.strip().lower()
-        annotation = 1 if response_text.startswith("yes") else 0 if response_text.startswith("no") else None
+        annotation = (
+            1 if response_text.startswith("yes")
+            else 0 if response_text.startswith("no")
+            else None
+        )
         if annotation is not None:
             if concept not in results:
                 results[concept] = {}

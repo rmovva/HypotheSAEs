@@ -10,6 +10,7 @@ from pathlib import Path
 import time
 
 from .llm_api import get_completion
+from .llm_local import is_local_model, get_local_completions
 from .utils import load_prompt, truncate_text
 
 CACHE_DIR = os.path.join(Path(__file__).parent.parent, 'annotation_cache')
@@ -135,6 +136,55 @@ def _parallel_annotate(
             except Exception as e:
                 print(f"Failed to annotate text for concept '{concept}' during retry: {e}")
 
+def _local_annotate(
+    tasks: List[Tuple[str, str]],
+    cache: dict,
+    cache_path: Optional[str],
+    results: Dict[str, Dict[str, int]],
+    progress_desc: str = "Annotating",
+    show_progress: bool = True,
+    batch_size: int = 4,
+    max_words_per_example: Optional[int] = None,
+    temperature: float = 0.0,
+    model: str = "google/gemma-2-2b-it",
+) -> None:
+    prompts = []
+    mapping = []
+    prompt_template = load_prompt("annotate")
+    for text, concept in tasks:
+        if max_words_per_example:
+            text = truncate_text(text, max_words_per_example)
+        prompt = prompt_template.format(hypothesis=concept, text=text)
+        prompts.append(prompt)
+        mapping.append((text, concept))
+
+    completions = []
+    iterator = range(0, len(prompts), batch_size)
+    if show_progress:
+        total = (len(prompts) + batch_size - 1) // batch_size
+        iterator = tqdm(iterator, desc=progress_desc, total=total)
+    for i in iterator:
+        batch_prompts = prompts[i : i + batch_size]
+        completions.extend(
+            get_local_completions(
+                batch_prompts,
+                model=model,
+                batch_size=len(batch_prompts),
+                max_new_tokens=1,
+                temperature=temperature,
+            )
+        )
+
+    for (text, concept), completion in zip(mapping, completions):
+        response_text = completion.strip().lower()
+        annotation = 1 if response_text.startswith("yes") else 0 if response_text.startswith("no") else None
+        if annotation is not None:
+            if concept not in results:
+                results[concept] = {}
+            results[concept][text] = annotation
+            if cache_path:
+                cache[generate_cache_key(concept, text)] = annotation
+
 def annotate(
     tasks: List[Tuple[str, str]],
     cache_path: Optional[str] = None,
@@ -175,15 +225,26 @@ def annotate(
 
     # Annotate uncached tasks
     if uncached_tasks:
-        _parallel_annotate(
-            tasks=uncached_tasks,
-            n_workers=n_workers,
-            cache=cache,
-            cache_path=cache_path,
-            results=results,
-            show_progress=show_progress,
-            **kwargs
-        )
+        if is_local_model(kwargs.get("model", "")):
+            _local_annotate(
+                tasks=uncached_tasks,
+                cache=cache,
+                cache_path=cache_path,
+                results=results,
+                show_progress=show_progress,
+                progress_desc=kwargs.get("progress_desc", "Annotating"),
+                **kwargs,
+            )
+        else:
+            _parallel_annotate(
+                tasks=uncached_tasks,
+                n_workers=n_workers,
+                cache=cache,
+                cache_path=cache_path,
+                results=results,
+                show_progress=show_progress,
+                **kwargs
+            )
 
     # Save cache if path provided
     if cache_path:

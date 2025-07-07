@@ -8,6 +8,7 @@ import os
 from dataclasses import dataclass, field
 
 from .llm_api import get_completion
+from .llm_local import is_local_model, get_local_completions
 from .utils import load_prompt, truncate_text
 from .annotate import annotate, CACHE_DIR
 
@@ -272,14 +273,65 @@ class NeuronInterpreter:
     ) -> Dict[int, List[str]]:
         """Generate interpretations for multiple neurons with multiple candidates each."""
         config = config or InterpretConfig()
-        
         interpretation_tasks = [
             (neuron_idx, candidate_idx)
             for neuron_idx in neuron_indices
             for candidate_idx in range(config.n_candidates)
         ]
-        
+
         interpretations = {idx: [] for idx in neuron_indices}
+
+        if is_local_model(self.interpreter_model):
+            prompts = []
+            task_lookup = []
+            for neuron_idx, _ in interpretation_tasks:
+                if np.all(activations[:, neuron_idx] <= 0):
+                    print(
+                        f"Warning: All activations for neuron {neuron_idx} are <= 0. This neuron may be dead. Skipping interpretation."
+                    )
+                    task_lookup.append((neuron_idx, None))
+                    prompts.append(None)
+                    continue
+
+                formatted_examples = config.sampling.function(
+                    texts=texts,
+                    activations=activations,
+                    neuron_idx=neuron_idx,
+                    n_examples=config.sampling.n_examples,
+                    max_words_per_example=config.sampling.max_words_per_example,
+                    random_seed=config.sampling.random_seed,
+                    **config.sampling.sampling_kwargs,
+                )
+                prompt_template = load_prompt(config.prompt_name)
+                prompt = prompt_template.format(
+                    task_specific_instructions=config.task_specific_instructions,
+                    **formatted_examples,
+                )
+                prompts.append(prompt)
+                task_lookup.append((neuron_idx, 0))
+
+            valid_pairs = [i for i, p in enumerate(prompts) if p is not None]
+            valid_prompts = [prompts[i] for i in valid_pairs]
+            if valid_prompts:
+                responses = get_local_completions(
+                    valid_prompts,
+                    model=self.interpreter_model,
+                    max_new_tokens=config.llm.max_interpretation_tokens,
+                    temperature=config.llm.temperature,
+                )
+            else:
+                responses = []
+
+            resp_iter = iter(responses)
+            for idx, (neuron_idx, _) in enumerate(task_lookup):
+                if prompts[idx] is None:
+                    interpretations[neuron_idx].append(None)
+                else:
+                    interpretation = self._parse_interpretation(next(resp_iter))
+                    interpretations[neuron_idx].append(interpretation)
+
+            return interpretations
+
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.n_workers_interpretation) as executor:
             future_to_task = {
                 executor.submit(
@@ -287,23 +339,28 @@ class NeuronInterpreter:
                     texts=texts,
                     activations=activations,
                     neuron_idx=neuron_idx,
-                    config=config
+                    config=config,
                 ): (neuron_idx, candidate_idx)
                 for neuron_idx, candidate_idx in interpretation_tasks
             }
-            
+
             iterator = concurrent.futures.as_completed(future_to_task)
-            iterator = tqdm(iterator, total=len(interpretation_tasks), 
-                           desc=f"Generating {config.n_candidates} interpretation(s) per neuron")
-            
+            iterator = tqdm(
+                iterator,
+                total=len(interpretation_tasks),
+                desc=f"Generating {config.n_candidates} interpretation(s) per neuron",
+            )
+
             for future in iterator:
                 neuron_idx, candidate_idx = future_to_task[future]
                 try:
                     interpretation = future.result()
                     interpretations[neuron_idx].append(interpretation)
                 except Exception as e:
-                    print(f"Failed to generate interpretation {candidate_idx} for neuron {neuron_idx}: {e}")
-        
+                    print(
+                        f"Failed to generate interpretation {candidate_idx} for neuron {neuron_idx}: {e}"
+                    )
+
         return interpretations
 
     def _compute_metrics(

@@ -15,7 +15,7 @@ from hypothesaes import (
 from hypothesaes.sae import get_sae_checkpoint_name, load_model
 
 from hypothesaes.llm_api import get_completion
-from tests.sentences import BLUE_SENTENCES, RED_SENTENCES, ALL_TEST_SENTENCES
+from .sentences import BLUE_SENTENCES, RED_SENTENCES, ALL_TEST_SENTENCES
 
 if os.getenv('OPENAI_KEY_SAE') is None or os.getenv('OPENAI_KEY_SAE') == '...':
     raise ValueError("Please set the OPENAI_KEY_SAE environment variable before running tests.")

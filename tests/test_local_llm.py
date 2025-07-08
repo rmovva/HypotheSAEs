@@ -3,38 +3,35 @@ from hypothesaes import get_local_embeddings, train_sae
 from hypothesaes import NeuronInterpreter, InterpretConfig, LLMConfig, SamplingConfig
 from hypothesaes.annotate import annotate
 
-from tests.sentences import BLUE_SENTENCES, RED_SENTENCES, ALL_TEST_SENTENCES
+from .sentences import BLUE_SENTENCES, RED_SENTENCES, ALL_TEST_SENTENCES
 
 LOCAL_EMBEDDER = "sentence-transformers/all-MiniLM-L6-v2"
-LOCAL_LLM = "google/gemma-2-2b-it"
+# LOCAL_LLM = "google/gemma-2-2b-it"
+LOCAL_LLM = "google/gemma-3-4b-it"
+# LOCAL_LLM = "Qwen/Qwen3-0.6B"
 
 def test_local_interpretation():
-    # Get local embeddings, train SAE, and get activations
-    emb_dict = get_local_embeddings(ALL_TEST_SENTENCES, model=LOCAL_EMBEDDER, show_progress=False)
-    embeddings = np.array([emb_dict[text] for text in ALL_TEST_SENTENCES])
-    sae = train_sae(embeddings, M=2, K=1, n_epochs=2)
-    activations = sae.get_activations(embeddings)
+    texts = BLUE_SENTENCES + RED_SENTENCES
+    activations = np.stack([
+        np.concatenate([np.ones(len(BLUE_SENTENCES)), np.zeros(len(RED_SENTENCES))]),
+        np.concatenate([np.zeros(len(BLUE_SENTENCES)), np.ones(len(RED_SENTENCES))])
+    ], axis=1)
 
-    interpreter = NeuronInterpreter(
-        interpreter_model=LOCAL_LLM,
-        annotator_model=LOCAL_LLM,
-        n_workers_interpretation=1,
-        n_workers_annotation=1,
-    )
+    interpreter = NeuronInterpreter(interpreter_model=LOCAL_LLM)
     config = InterpretConfig(
-        sampling=SamplingConfig(n_examples=4),
-        llm=LLMConfig(max_interpretation_tokens=50),
+        sampling=SamplingConfig(n_examples=20),
+        llm=LLMConfig(max_interpretation_tokens=50, temperature=0.7),
     )
-    results = interpreter.interpret_neurons(ALL_TEST_SENTENCES, activations, [0, 1], config)
-    print(results)
+    results = interpreter.interpret_neurons(texts, activations, neuron_indices=[0, 1], config=config)
+    print(f"Interpretations:\n - Neuron 0: {results[0][0]}\n - Neuron 1: {results[1][0]}")
     for idx in [0, 1]:
         assert idx in results
         assert isinstance(results[idx][0], str)
         assert len(results[idx][0]) > 0
 
 def test_local_annotation():
-    blue_concept = "mentions something that is blue"
-    red_concept = "mentions something that is red"
+    blue_concept = "contains words associated with the color blue"
+    red_concept = "contains words associated with the color red"
     positive_tasks = [(text, blue_concept) for text in BLUE_SENTENCES] + [(text, red_concept) for text in RED_SENTENCES]
     negative_tasks = [(text, blue_concept) for text in RED_SENTENCES] + [(text, red_concept) for text in BLUE_SENTENCES]
     results = annotate(positive_tasks + negative_tasks, model=LOCAL_LLM, show_progress=True, n_workers=1)
@@ -52,7 +49,7 @@ def test_local_annotation():
         
         precision = tp / (tp + fp) if (tp + fp) > 0 else 0
         recall = tp / (tp + fn) if (tp + fn) > 0 else 0
-        print(f"{concept.split()[1]} concept - P: {precision:.3f}, R: {recall:.3f}")
+        print(f"Concept: '{concept}' - precision: {precision:.2f}, recall: {recall:.2f}")
 
     for concept_dict in results.values():
         for val in concept_dict.values():

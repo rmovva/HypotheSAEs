@@ -233,6 +233,8 @@ class NeuronInterpreter:
             response = response[2:]
         if response.startswith('" -'):
             response = response[3:]
+        if '\n' in response:
+            response = response.split('\n')[0]
         return response.strip('"')
 
     def interpret_neuron(

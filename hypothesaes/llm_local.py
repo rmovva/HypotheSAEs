@@ -1,9 +1,12 @@
 """Local LLM utilities for HypotheSAEs."""
+import os
+os.environ["VLLM_LOGGING_LEVEL"] = "WARNING"
+os.environ["VLLM_WORKER_MULTIPROC_METHOD"] = "spawn"
 
-from typing import List, Optional
 import torch
 torch.set_float32_matmul_precision("high")
 
+from typing import List, Optional
 from functools import lru_cache
 
 from huggingface_hub import HfApi
@@ -35,7 +38,8 @@ def _get_engine(model: str) -> LLM:
     if engine is None:
         if 'qwen3' in model.lower():
             print("WARNING: Currently, Qwen3 models and other `thinking` models may not have their outputs parsed correctly.")
-        engine = LLM(model=model, dtype="float32")
+        print(f"Loading {model} in vLLM...")
+        engine = LLM(model=model, task="generate")
         tokenizer = engine.get_tokenizer()
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
@@ -47,36 +51,113 @@ def _get_engine(model: str) -> LLM:
     return engine
 
 
+# def get_local_completions(
+#     prompts: List[str],
+#     model: str = "google/gemma-3-1b-it",
+#     batch_size: int = 4,
+#     max_new_tokens: int = 128,
+#     temperature: float = 0.7,
+#     show_progress: bool = True,
+#     progress_desc: Optional[str] = None,
+# ) -> List[str]:
+#     """Generate completions for *prompts* with real‑time progress feedback."""
+#     engine = _get_engine(model)
+#     tokenizer = engine.get_tokenizer()
+#     is_chat_model = getattr(tokenizer, "chat_template", None) is not None
+
+#     if is_chat_model:
+#         messages = [[{"role": "user", "content": p}] for p in prompts]
+#         print("Generating completions for chat model...")
+#         outputs = engine.chat(
+#             messages,
+#             sampling_params=SamplingParams(max_tokens=max_new_tokens, temperature=temperature),
+#             use_tqdm=show_progress,
+#         )
+#     else:
+#         print("Generating completions for non-chat model...")
+#         outputs = engine.generate(
+#             prompts,
+#             sampling_params=SamplingParams(max_tokens=max_new_tokens, temperature=temperature),
+#             use_tqdm=show_progress,
+#         )
+
+#     completions = [str(out.outputs[0].text) for out in outputs]
+#     print(completions)
+#     return completions
+
 def get_local_completions(
     prompts: List[str],
     model: str = "google/gemma-3-1b-it",
-    batch_size: int = 4,
+    max_batch_tokens: int = 16384,  # Adjust based on model size
     max_new_tokens: int = 128,
     temperature: float = 0.7,
     show_progress: bool = True,
     progress_desc: Optional[str] = None,
 ) -> List[str]:
-    """Generate completions for *prompts* with real‑time progress feedback."""
+    """Generate completions with token-based batching."""
     engine = _get_engine(model)
     tokenizer = engine.get_tokenizer()
     is_chat_model = getattr(tokenizer, "chat_template", None) is not None
-
+    
+    # Pre-tokenize to count tokens
     if is_chat_model:
-        messages = [[{"role": "user", "content": p}] for p in prompts]
-        outputs = engine.chat(
-            messages,
-            sampling_params=SamplingParams(max_tokens=max_new_tokens, temperature=temperature),
-            use_tqdm=show_progress,
-        )
+        formatted_prompts = [
+            tokenizer.apply_chat_template([{"role": "user", "content": p}], 
+                                        tokenize=False, add_generation_prompt=True)
+            for p in prompts
+        ]
     else:
-        outputs = engine.generate(
-            prompts,
-            sampling_params=SamplingParams(max_tokens=max_new_tokens, temperature=temperature),
-            use_tqdm=show_progress,
-        )
-
-    completions: List[str] = []
-    for out in outputs:
-        completions.append(str(out.outputs[0].text))
-
-    return completions
+        formatted_prompts = prompts
+    
+    # Tokenize all prompts to get lengths
+    tokenized = tokenizer(formatted_prompts, add_special_tokens=True)
+    token_lengths = [len(ids) for ids in tokenized['input_ids']]
+    
+    # Create batches based on token count
+    batches = []
+    current_batch = []
+    current_batch_indices = []
+    current_token_count = 0
+    
+    for i, (prompt, token_len) in enumerate(zip(prompts, token_lengths)):
+        # Account for both input and max output tokens
+        total_tokens_for_prompt = token_len + max_new_tokens
+        
+        if current_token_count + total_tokens_for_prompt > max_batch_tokens and current_batch:
+            batches.append((current_batch, current_batch_indices))
+            current_batch = []
+            current_batch_indices = []
+            current_token_count = 0
+        
+        current_batch.append(prompt)
+        current_batch_indices.append(i)
+        current_token_count += total_tokens_for_prompt
+    
+    if current_batch:
+        batches.append((current_batch, current_batch_indices))
+    
+    # Process batches
+    all_completions = [None] * len(prompts)
+    
+    for batch_prompts, batch_indices in tqdm(batches, 
+                                            desc=progress_desc or f"Processing {len(batches)} batches",
+                                            disable=not show_progress):
+        if is_chat_model:
+            messages = [[{"role": "user", "content": p}] for p in batch_prompts]
+            outputs = engine.chat(
+                messages,
+                sampling_params=SamplingParams(max_tokens=max_new_tokens, temperature=temperature),
+                use_tqdm=False,
+            )
+        else:
+            outputs = engine.generate(
+                batch_prompts,
+                sampling_params=SamplingParams(max_tokens=max_new_tokens, temperature=temperature),
+                use_tqdm=False,
+            )
+        
+        # Place results in correct positions
+        for idx, output in zip(batch_indices, outputs):
+            all_completions[idx] = str(output.outputs[0].text)
+    
+    return all_completions

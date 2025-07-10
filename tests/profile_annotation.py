@@ -12,10 +12,10 @@ from hypothesaes.utils import get_text_for_printing
 
 def main():
     parser = argparse.ArgumentParser(description="Profile annotation with local LLM on Yelp data")
-    parser.add_argument("--n_rows", type=int, default=1000, help="Number of rows to process")
+    parser.add_argument("--n", type=int, default=1000, help="Number of rows to process")
     parser.add_argument("--concept", type=str, default="mentions anticipation or plans to return to the restaurant or order again", 
                        help="Concept to annotate")
-    parser.add_argument("--model", type=str, default="google/gemma-3-4b-it", 
+    parser.add_argument("--model", type=str, default="google/gemma-3-1b-it", 
                        help="LLM to use for annotation")
     args = parser.parse_args()
 
@@ -24,7 +24,7 @@ def main():
     train_df = pd.read_json("../demo-data/yelp-demo-train-20K.json", lines=True)
 
     # Take specified number of rows
-    df_subset = train_df.head(args.n_rows)
+    df_subset = train_df.head(args.n)
     texts = df_subset['text'].tolist()
     stars = df_subset['stars'].values
 

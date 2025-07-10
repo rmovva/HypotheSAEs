@@ -165,7 +165,7 @@ def _local_annotate(
     completions = get_local_completions(
         prompts,
         model=model,
-        batch_size=batch_size,
+        # batch_size=batch_size,
         max_new_tokens=1,
         temperature=temperature,
         show_progress=show_progress,

@@ -6,7 +6,7 @@ from hypothesaes.annotate import annotate
 from .sentences import BLUE_SENTENCES, RED_SENTENCES, ALL_TEST_SENTENCES
 
 LOCAL_EMBEDDER = "sentence-transformers/all-MiniLM-L6-v2"
-LOCAL_LLM = "google/gemma-3-4b-it"
+LOCAL_LLM = "google/gemma-3-1b-it"
 
 def test_local_interpretation():
     texts = BLUE_SENTENCES + RED_SENTENCES

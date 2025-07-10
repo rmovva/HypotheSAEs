@@ -84,6 +84,7 @@ def annotate_single_text(
 
 def _parallel_annotate(
     tasks: List[Tuple[str, str]],
+    model: str,
     n_workers: int,
     cache: dict,
     cache_path: Optional[str],
@@ -97,7 +98,7 @@ def _parallel_annotate(
     
     with concurrent.futures.ThreadPoolExecutor(max_workers=n_workers) as executor:
         future_to_task = {
-            executor.submit(annotate_single_text, text=text, concept=concept, **kwargs): 
+            executor.submit(annotate_single_text, text=text, concept=concept, model=model, **kwargs): 
             (text, concept)
             for text, concept in tasks
         }
@@ -126,7 +127,7 @@ def _parallel_annotate(
         print(f"Retrying {len(retry_tasks)} failed tasks...")
         for text, concept in retry_tasks:
             try:
-                annotation, _ = annotate_single_text(text=text, concept=concept, **kwargs)
+                annotation, _ = annotate_single_text(text=text, concept=concept, model=model, **kwargs)
                 if annotation is not None:
                     if concept not in results:
                         results[concept] = {}
@@ -141,12 +142,12 @@ def _local_annotate(
     cache: dict,
     cache_path: Optional[str],
     results: Dict[str, Dict[str, int]],
+    model: str = "google/gemma-3-1b-it",
     progress_desc: str = "Annotating",
     show_progress: bool = True,
     batch_size: int = 4,
     max_words_per_example: Optional[int] = None,
     temperature: float = 0.0,
-    model: str = "google/gemma-2-2b-it",
 ) -> None:
     """Annotate (text, concept) tasks with a local HF model, using a single
     call to `get_local_completions`.
@@ -188,6 +189,7 @@ def _local_annotate(
 
 def annotate(
     tasks: List[Tuple[str, str]],
+    model: str = "gpt-4.1-mini",
     cache_path: Optional[str] = None,
     n_workers: int = DEFAULT_N_WORKERS,
     show_progress: bool = True,
@@ -198,6 +200,7 @@ def annotate(
     
     Args:
         tasks: List of (text, concept) tuples to annotate
+        model: Model to use for annotation
         cache_path: Path to cache file
         n_workers: Number of workers for parallel processing
         show_progress: Whether to show progress bar
@@ -226,9 +229,10 @@ def annotate(
 
     # Annotate uncached tasks
     if uncached_tasks:
-        if is_local_model(kwargs.get("model", "")):
+        if is_local_model(model):
             _local_annotate(
                 tasks=uncached_tasks,
+                model=model,
                 cache=cache,
                 cache_path=cache_path,
                 results=results,
@@ -238,6 +242,7 @@ def annotate(
         else:
             _parallel_annotate(
                 tasks=uncached_tasks,
+                model=model,
                 n_workers=n_workers,
                 cache=cache,
                 cache_path=cache_path,
@@ -255,6 +260,7 @@ def annotate(
 def annotate_texts_with_concepts(
     texts: List[str],
     concepts: List[str],
+    model: str = "gpt-4.1-mini",
     cache_name: Optional[str] = None,
     progress_desc: str = "Annotating",
     show_progress: bool = True,
@@ -271,6 +277,7 @@ def annotate_texts_with_concepts(
     # Use the annotate function to process tasks
     results = annotate(
         tasks=tasks,
+        model=model,
         cache_path=os.path.join(CACHE_DIR, f"{cache_name}_hypothesis-eval.json") if cache_name else None,
         n_workers=kwargs.pop('n_workers', DEFAULT_N_WORKERS),
         show_progress=show_progress,

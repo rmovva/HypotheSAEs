@@ -233,7 +233,6 @@ def annotate(
                 cache_path=cache_path,
                 results=results,
                 show_progress=show_progress,
-                progress_desc=kwargs.get("progress_desc", "Annotating"),
                 **kwargs,
             )
         else:

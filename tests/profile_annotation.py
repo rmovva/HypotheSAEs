@@ -15,13 +15,13 @@ def main():
     parser.add_argument("--n", type=int, default=1000, help="Number of rows to process")
     parser.add_argument("--concept", type=str, default="mentions anticipation or plans to return to the restaurant or order again", 
                        help="Concept to annotate")
-    parser.add_argument("--model", type=str, default="google/gemma-3-1b-it", 
+    parser.add_argument("--model", type=str, default="google/gemma-3-12b-it", 
                        help="LLM to use for annotation")
     args = parser.parse_args()
 
     # Load demo data
     print("Loading Yelp demo data...")
-    train_df = pd.read_json("../demo-data/yelp-demo-train-20K.json", lines=True)
+    train_df = pd.read_json("../demo-data/yelp-demo-holdout-2K.json", lines=True)
 
     # Take specified number of rows
     df_subset = train_df.head(args.n)

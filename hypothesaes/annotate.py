@@ -154,7 +154,7 @@ def _local_annotate(
     """
     # Collect annotation prompts and truncate any texts if necessary
     prompts, mapping = [], []
-    prompt_template = load_prompt("annotate")
+    prompt_template = load_prompt("annotate-simple")
     for text, concept in tasks:
         if max_words_per_example:
             text = truncate_text(text, max_words_per_example)
@@ -166,7 +166,7 @@ def _local_annotate(
         prompts,
         model=model,
         # batch_size=batch_size,
-        max_new_tokens=1,
+        max_new_tokens=10,
         temperature=temperature,
         show_progress=show_progress,
         progress_desc=progress_desc,
@@ -175,6 +175,8 @@ def _local_annotate(
     # Parse completions, update results & cache
     for (text, concept), completion in zip(mapping, completions):
         response_text = completion.strip().lower()
+        if '</think>' in response_text:
+            response_text = response_text.split('</think>')[1].strip()
         annotation = (
             1 if response_text.startswith("yes")
             else 0 if response_text.startswith("no")

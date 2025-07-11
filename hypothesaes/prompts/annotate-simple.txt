@@ -1,0 +1,5 @@
+Check whether the TEXT satisfies a PROPERTY. Respond with "Yes" or "No". When uncertain, output "No". Do not include any other text in your response.
+
+PROPERTY: "{hypothesis}"
+TEXT: "{text}"
+Output ("Yes" or "No" only):

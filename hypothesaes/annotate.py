@@ -60,11 +60,13 @@ def parse_completion(completion: str) -> int:
 def annotate_single_text(
     text: str,
     concept: str,
+    prompt_template_name: str = "annotate",
     model: str = "gpt-4o-mini",
     max_words_per_example: Optional[int] = None,
     temperature: float = 0.0,
+    max_tokens: int = 1,
     max_retries: int = 3,
-    timeout: float = 5.0
+    timeout: float = 5.0,
 ) -> Tuple[Optional[int], float]:  # Return tuple of (result, api_time)
     """
     Annotate a single text with given concept using LLM.
@@ -73,7 +75,7 @@ def annotate_single_text(
     if max_words_per_example:
         text = truncate_text(text, max_words_per_example)
         
-    prompt_template = load_prompt("annotate")
+    prompt_template = load_prompt(prompt_template_name)
     prompt = prompt_template.format(hypothesis=concept, text=text)
     
     total_api_time = 0.0
@@ -84,7 +86,7 @@ def annotate_single_text(
                 prompt=prompt,
                 model=model,
                 temperature=temperature,
-                max_tokens=1,
+                max_tokens=max_tokens,
                 timeout=timeout
             ).strip().lower()
             total_api_time += time.time() - start_time
@@ -154,8 +156,8 @@ def _local_annotate(
     model: str = "Qwen/Qwen3-0.6B",
     show_progress: bool = True,
     max_words_per_example: Optional[int] = None,
-    prompt_template: str = "annotate-simple",
-    max_new_tokens: int = 10,
+    prompt_template_name: str = "annotate-simple",
+    max_tokens: int = 10,
     temperature: float = 0.0,
     max_retries: int = 3,
     sampling_kwargs: Optional[dict] = {},
@@ -164,7 +166,7 @@ def _local_annotate(
     """Annotate (text, concept) tasks with a local HF model, using a single
     call to `get_local_completions`.
     """
-    prompt_template = load_prompt(prompt_template)
+    prompt_template = load_prompt(prompt_template_name)
     remaining_tasks = tasks.copy()
     
     for retry_count in range(max_retries + 1):
@@ -183,7 +185,7 @@ def _local_annotate(
             prompts,
             model=model,
             show_progress=show_progress and retry_count == 0,
-            max_new_tokens=max_new_tokens,
+            max_tokens=max_tokens,
             temperature=temperature,
             sampling_kwargs=sampling_kwargs,
             tokenizer_kwargs=tokenizer_kwargs,

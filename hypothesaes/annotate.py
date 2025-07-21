@@ -35,7 +35,7 @@ def save_annotation_cache(cache_path: str, cache: dict) -> None:
 
 def generate_cache_key(concept: str, text: str) -> str:
     """Generate a cache key for a given concept and text."""
-    return f"{concept}|||{text[:100]}...{text[-100:]}"
+    return f"{concept}|||{text[:100]}[...]{text[-100:]}"
 
 def _store_annotation(
     results: Dict[str, Dict[str, int]],
@@ -158,6 +158,8 @@ def _local_annotate(
     max_new_tokens: int = 10,
     temperature: float = 0.0,
     max_retries: int = 3,
+    sampling_kwargs: Optional[dict] = {},
+    tokenizer_kwargs: Optional[dict] = {},
 ) -> None:
     """Annotate (text, concept) tasks with a local HF model, using a single
     call to `get_local_completions`.
@@ -172,9 +174,8 @@ def _local_annotate(
         # Collect annotation prompts and truncate any texts if necessary
         prompts, mapping = [], []
         for text, concept in remaining_tasks:
-            if max_words_per_example:
-                text = truncate_text(text, max_words_per_example)
-            prompts.append(prompt_template.format(hypothesis=concept, text=text))
+            truncated_text = truncate_text(text, max_words_per_example) # If None, no truncation
+            prompts.append(prompt_template.format(hypothesis=concept, text=truncated_text))
             mapping.append((text, concept))
 
         # Get annotation completions with local LLM
@@ -184,6 +185,8 @@ def _local_annotate(
             show_progress=show_progress,
             max_new_tokens=max_new_tokens,
             temperature=temperature,
+            sampling_kwargs=sampling_kwargs,
+            tokenizer_kwargs=tokenizer_kwargs,
         )
 
         # Parse completions, update results & cache, track failed tasks
@@ -201,6 +204,12 @@ def _local_annotate(
         
         if failed_tasks and retry_count < max_retries:
             print(f"Retry {retry_count + 1}/{max_retries}: {len(failed_tasks)}/{len(tasks)} tasks failed annotation")
+    
+    # Assign 0 to any tasks that still failed after all retries
+    if remaining_tasks:
+        print(f"Assigning 0 to {len(remaining_tasks)} tasks that failed after {max_retries} retries")
+        for text, concept in remaining_tasks:
+            _store_annotation(results, concept, text, 0, cache)
 
 def annotate(
     tasks: List[Tuple[str, str]],

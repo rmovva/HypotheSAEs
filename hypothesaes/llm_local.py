@@ -52,8 +52,8 @@ def get_local_completions(
     max_new_tokens: int = 128,
     temperature: float = 0.7,
     show_progress: bool = True,
-    tokenizer_kwargs: Optional[dict] = None,
-    sampling_kwargs: Optional[dict] = None,
+    tokenizer_kwargs: Optional[dict] = {},
+    sampling_kwargs: Optional[dict] = {},
 ) -> List[str]:
     """Generate completions using vLLM with llm.generate()."""
     engine = _get_engine(model)

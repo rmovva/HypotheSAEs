@@ -73,7 +73,7 @@ def _get_engine(model: str, **kwargs) -> LLM:
 def get_local_completions(
     prompts: List[str],
     model: str = "Qwen/Qwen3-0.6B",
-    max_new_tokens: int = 128,
+    max_tokens: int = 128,
     temperature: float = 0.7,
     show_progress: bool = True,
     tokenizer_kwargs: Optional[dict] = {},
@@ -87,15 +87,16 @@ def get_local_completions(
         messages_lists = [[{"role": "user", "content": p}] for p in prompts]
         prompts = [tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True, **tokenizer_kwargs)
                    for messages in messages_lists]
-        # print(prompts)
 
-    sampling_params = SamplingParams(max_tokens=max_new_tokens, temperature=temperature, **sampling_kwargs)
+    
+    # If show_progress is True, only show tqdm bar for actual inference, not for preparing prompts for inference
+    use_tqdm = (lambda it, *a, **k: tqdm(it, *a, **k) if "Processed prompts" in k.get("desc", "") else it) if show_progress else False
+    sampling_params = SamplingParams(max_tokens=max_tokens, temperature=temperature, **sampling_kwargs)
     outputs = engine.generate(
         prompts,
         sampling_params=sampling_params,
-        use_tqdm=show_progress,
+        use_tqdm=use_tqdm,
     )
 
     completions = [str(out.outputs[0].text) for out in outputs]
-    # print(completions)
     return completions

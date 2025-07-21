@@ -34,11 +34,13 @@ def is_local_model(model: str) -> bool:
 
 def _sleep_all_except(active_model: Optional[str] = None) -> None:
     """Put every cached vLLM engine *except* `active` to sleep."""
-    for name, eng in _LOCAL_ENGINES.items():
+    for name, llm in _LOCAL_ENGINES.items():
         if name == active_model:
             continue
+        if llm.llm_engine.is_sleeping():
+            continue
         print(f"Sleeping {name} to free GPU memory...")
-        eng.sleep(level=2) # Level 1 clears KV cache and moves weights to CPU; Level 2 clears cache + clears weights entirely
+        llm.sleep(level=2) # Level 1 clears KV cache and moves weights to CPU; Level 2 clears cache + clears weights entirely
 
 def _get_engine(model: str, **kwargs) -> LLM:
     """
@@ -55,7 +57,8 @@ def _get_engine(model: str, **kwargs) -> LLM:
 
         print(f"Loading {model} in vLLM...")
         t0 = time.time()
-        engine = LLM(model=model, task="generate", enable_sleep_mode=True, **kwargs)
+        gpu_memory_utilization = kwargs.pop("gpu_memory_utilization", 0.7)
+        engine = LLM(model=model, task="generate", enable_sleep_mode=True, gpu_memory_utilization=gpu_memory_utilization, **kwargs)
         _LOCAL_ENGINES[model] = engine
         dtype = getattr(engine.llm_engine.get_model_config(), "dtype", "unknown")
         print(f"Loaded {model} with dtype: {dtype} (took {time.time()-t0:.1f}s)")
@@ -84,6 +87,7 @@ def get_local_completions(
         messages_lists = [[{"role": "user", "content": p}] for p in prompts]
         prompts = [tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True, **tokenizer_kwargs)
                    for messages in messages_lists]
+        # print(prompts)
 
     sampling_params = SamplingParams(max_tokens=max_new_tokens, temperature=temperature, **sampling_kwargs)
     outputs = engine.generate(
@@ -93,4 +97,5 @@ def get_local_completions(
     )
 
     completions = [str(out.outputs[0].text) for out in outputs]
+    # print(completions)
     return completions

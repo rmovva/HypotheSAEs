@@ -192,8 +192,7 @@ def _local_annotate(
         # Parse completions, update results & cache, track failed tasks
         failed_tasks = []
         for (text, concept), completion in zip(mapping, completions):
-            response_text = completion.strip().lower()
-            annotation = parse_completion(response_text)
+            annotation = parse_completion(completion.strip().lower())
             if annotation is not None:
                 _store_annotation(results, concept, text, annotation, cache)
             else:

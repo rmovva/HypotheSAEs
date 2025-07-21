@@ -37,6 +37,26 @@ def generate_cache_key(concept: str, text: str) -> str:
     """Generate a cache key for a given concept and text."""
     return f"{concept}|||{text[:100]}...{text[-100:]}"
 
+def _store_annotation(
+    results: Dict[str, Dict[str, int]],
+    concept: str,
+    text: str,
+    annotation: int,
+    cache: Optional[dict] = None,
+) -> None:
+    """Insert an annotation into results and (optionally) cache."""
+    if concept not in results:
+        results[concept] = {}
+    results[concept][text] = annotation
+    if cache:
+        cache[generate_cache_key(concept, text)] = annotation
+
+def parse_completion(completion: str) -> int:
+    """Parse a completion into an annotation."""
+    if '</think>' in completion:
+        completion = completion.split('</think>')[1].strip()
+    return 1 if completion.startswith("yes") else 0 if completion.startswith("no") else None
+
 def annotate_single_text(
     text: str,
     concept: str,
@@ -69,10 +89,9 @@ def annotate_single_text(
             ).strip().lower()
             total_api_time += time.time() - start_time
             
-            if response_text == "yes":
-                return 1, total_api_time
-            elif response_text == "no":
-                return 0, total_api_time
+            annotation = parse_completion(response_text)
+            if annotation is not None:
+                return annotation, total_api_time
             
         except Exception as e:
             if attempt == max_retries - 1:
@@ -86,9 +105,8 @@ def _parallel_annotate(
     tasks: List[Tuple[str, str]],
     model: str,
     n_workers: int,
-    cache: dict,
-    cache_path: Optional[str],
     results: Dict[str, Dict[str, int]],
+    cache: Optional[dict] = None,
     progress_desc: str = "Annotating",
     show_progress: bool = True,
     **kwargs
@@ -113,11 +131,7 @@ def _parallel_annotate(
             try:
                 annotation, _ = future.result()
                 if annotation is not None:
-                    if concept not in results:
-                        results[concept] = {}
-                    results[concept][text] = annotation
-                    if cache_path:
-                        cache[generate_cache_key(concept, text)] = annotation
+                    _store_annotation(results, concept, text, annotation, cache)
             except Exception as e:
                 retry_tasks.append((text, concept))
                 print(f"Failed to annotate text for concept '{concept}': {e}")
@@ -129,65 +143,64 @@ def _parallel_annotate(
             try:
                 annotation, _ = annotate_single_text(text=text, concept=concept, model=model, **kwargs)
                 if annotation is not None:
-                    if concept not in results:
-                        results[concept] = {}
-                    results[concept][text] = annotation
-                    if cache_path:
-                        cache[generate_cache_key(concept, text)] = annotation
+                    _store_annotation(results, concept, text, annotation, cache)
             except Exception as e:
                 print(f"Failed to annotate text for concept '{concept}' during retry: {e}")
 
 def _local_annotate(
     tasks: List[Tuple[str, str]],
-    cache: dict,
-    cache_path: Optional[str],
     results: Dict[str, Dict[str, int]],
-    model: str = "google/gemma-3-1b-it",
-    progress_desc: str = "Annotating",
+    cache: Optional[dict] = None,
+    model: str = "Qwen/Qwen3-0.6B",
     show_progress: bool = True,
-    batch_size: int = 4,
     max_words_per_example: Optional[int] = None,
+    prompt_template: str = "annotate-simple",
+    max_new_tokens: int = 10,
     temperature: float = 0.0,
+    max_retries: int = 3,
 ) -> None:
     """Annotate (text, concept) tasks with a local HF model, using a single
     call to `get_local_completions`.
     """
-    # Collect annotation prompts and truncate any texts if necessary
-    prompts, mapping = [], []
-    prompt_template = load_prompt("annotate-simple")
-    for text, concept in tasks:
-        if max_words_per_example:
-            text = truncate_text(text, max_words_per_example)
-        prompts.append(prompt_template.format(hypothesis=concept, text=text))
-        mapping.append((text, concept))
+    prompt_template = load_prompt(prompt_template)
+    remaining_tasks = tasks.copy()
+    
+    for retry_count in range(max_retries + 1):
+        if not remaining_tasks:
+            break
+            
+        # Collect annotation prompts and truncate any texts if necessary
+        prompts, mapping = [], []
+        for text, concept in remaining_tasks:
+            if max_words_per_example:
+                text = truncate_text(text, max_words_per_example)
+            prompts.append(prompt_template.format(hypothesis=concept, text=text))
+            mapping.append((text, concept))
 
-    # Get annotation completions with local LLM
-    completions = get_local_completions(
-        prompts,
-        model=model,
-        # batch_size=batch_size,
-        max_new_tokens=10,
-        temperature=temperature,
-        show_progress=show_progress,
-        progress_desc=progress_desc,
-    )
-
-    # Parse completions, update results & cache
-    for (text, concept), completion in zip(mapping, completions):
-        response_text = completion.strip().lower()
-        if '</think>' in response_text:
-            response_text = response_text.split('</think>')[1].strip()
-        annotation = (
-            1 if response_text.startswith("yes")
-            else 0 if response_text.startswith("no")
-            else None
+        # Get annotation completions with local LLM
+        completions = get_local_completions(
+            prompts,
+            model=model,
+            show_progress=show_progress,
+            max_new_tokens=max_new_tokens,
+            temperature=temperature,
         )
-        if annotation is not None:
-            if concept not in results:
-                results[concept] = {}
-            results[concept][text] = annotation
-            if cache_path:
-                cache[generate_cache_key(concept, text)] = annotation
+
+        # Parse completions, update results & cache, track failed tasks
+        failed_tasks = []
+        for (text, concept), completion in zip(mapping, completions):
+            response_text = completion.strip().lower()
+            annotation = parse_completion(response_text)
+            if annotation is not None:
+                _store_annotation(results, concept, text, annotation, cache)
+            else:
+                failed_tasks.append((text, concept))
+        
+        # Update remaining tasks for next retry
+        remaining_tasks = failed_tasks
+        
+        if failed_tasks and retry_count < max_retries:
+            print(f"Retry {retry_count + 1}/{max_retries}: {len(failed_tasks)}/{len(tasks)} tasks failed annotation")
 
 def annotate(
     tasks: List[Tuple[str, str]],
@@ -236,7 +249,6 @@ def annotate(
                 tasks=uncached_tasks,
                 model=model,
                 cache=cache,
-                cache_path=cache_path,
                 results=results,
                 show_progress=show_progress,
                 **kwargs,
@@ -247,7 +259,6 @@ def annotate(
                 model=model,
                 n_workers=n_workers,
                 cache=cache,
-                cache_path=cache_path,
                 results=results,
                 show_progress=show_progress,
                 **kwargs

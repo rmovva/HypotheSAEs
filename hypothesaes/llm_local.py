@@ -37,6 +37,7 @@ def _sleep_all_except(active_model: Optional[str] = None) -> None:
     for name, eng in _LOCAL_ENGINES.items():
         if name == active_model:
             continue
+        print(f"Sleeping {name} to free GPU memory...")
         eng.sleep(level=2) # Level 1 clears KV cache and moves weights to CPU; Level 2 clears cache + clears weights entirely
 
 def _get_engine(model: str, **kwargs) -> LLM:
@@ -50,19 +51,18 @@ def _get_engine(model: str, **kwargs) -> LLM:
     engine = _LOCAL_ENGINES.get(model)
 
     if engine is None:
-        print("No engine found for", model, "trying to sleep all other engines...")
-        _sleep_all_except(active_model=None)         # free GPU before allocating
+        _sleep_all_except(active_model=None) # free GPU before allocating
 
         print(f"Loading {model} in vLLM...")
         t0 = time.time()
-        engine = LLM(model=model, task="generate", **kwargs)
+        engine = LLM(model=model, task="generate", enable_sleep_mode=True, **kwargs)
         _LOCAL_ENGINES[model] = engine
         dtype = getattr(engine.llm_engine.get_model_config(), "dtype", "unknown")
         print(f"Loaded {model} with dtype: {dtype} (took {time.time()-t0:.1f}s)")
     else:
         _sleep_all_except(active_model=model)
         if engine.llm_engine.is_sleeping(): 
-            print("Engine found for", model, "but model is sleeping, waking up...")
+            print(f"Engine found for {model} but model is sleeping, waking up...")
             engine.wake_up()
 
     return engine

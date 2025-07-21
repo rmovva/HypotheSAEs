@@ -17,7 +17,7 @@ from requests.exceptions import HTTPError
 from vllm import LLM, SamplingParams
 import time
 
-_LOCAL_ENGINES = {}
+_LOCAL_ENGINES: dict[str, LLM] = {}
 
 @lru_cache(maxsize=256) # Cache models that we've already checked
 def hf_model_exists(repo_id: str) -> bool:
@@ -32,18 +32,39 @@ def hf_model_exists(repo_id: str) -> bool:
 def is_local_model(model: str) -> bool:
     return model in _LOCAL_ENGINES or hf_model_exists(model)
 
-def _get_engine(model: str) -> LLM:
-    """Load and cache a vLLM engine for the given model."""
-    engine = _LOCAL_ENGINES.get(model)
-    if engine is None:
-        print(f"Loading {model} in vLLM...")
-        start_time = time.time()
+def _sleep_all_except(active_model: Optional[str] = None) -> None:
+    """Put every cached vLLM engine *except* `active` to sleep."""
+    for name, eng in _LOCAL_ENGINES.items():
+        if name == active_model:
+            continue
+        eng.sleep(level=2) # Level 1 clears KV cache and moves weights to CPU; Level 2 clears cache + clears weights entirely
 
-        engine = LLM(model=model, task="generate")
+def _get_engine(model: str, **kwargs) -> LLM:
+    """
+    Return a vLLM engine for `model`.
+
+    * If the engine is already cached, sleep the others and wake it.
+    * If it is not cached, sleep every other engine first so the GPU
+      is empty, then load the new model.
+    """
+    engine = _LOCAL_ENGINES.get(model)
+
+    if engine is None:
+        print("No engine found for", model, "trying to sleep all other engines...")
+        _sleep_all_except(active_model=None)         # free GPU before allocating
+
+        print(f"Loading {model} in vLLM...")
+        t0 = time.time()
+        engine = LLM(model=model, task="generate", **kwargs)
         _LOCAL_ENGINES[model] = engine
-        
         dtype = getattr(engine.llm_engine.get_model_config(), "dtype", "unknown")
-        print(f"Loaded {model} with dtype: {dtype} (took {time.time() - start_time:.1f}s)")
+        print(f"Loaded {model} with dtype: {dtype} (took {time.time()-t0:.1f}s)")
+    else:
+        _sleep_all_except(active_model=model)
+        if engine.llm_engine.is_sleeping(): 
+            print("Engine found for", model, "but model is sleeping, waking up...")
+            engine.wake_up()
+
     return engine
 
 def get_local_completions(

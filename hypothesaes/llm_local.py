@@ -67,6 +67,7 @@ def _get_engine(model: str, **kwargs) -> LLM:
         _sleep_all_except(active_model=model)
         if engine.llm_engine.is_sleeping(): 
             print(f"Engine found for {model} but model is sleeping, waking up...")
+            print(f"[WARNING]: This functionality is currently bugged in vLLM, where you may see nonsense outputs after waking up a model.")
             engine.wake_up()
             engine.llm_engine.reset_prefix_cache()
 

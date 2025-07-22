@@ -58,7 +58,7 @@ def _get_engine(model: str, **kwargs) -> LLM:
 
         print(f"Loading {model} in vLLM...")
         t0 = time.time()
-        gpu_memory_utilization = kwargs.pop("gpu_memory_utilization", 0.7)
+        gpu_memory_utilization = kwargs.pop("gpu_memory_utilization", 0.8)
         engine = LLM(model=model, task="generate", enable_sleep_mode=True, gpu_memory_utilization=gpu_memory_utilization, **kwargs)
         _LOCAL_ENGINES[model] = engine
         dtype = getattr(engine.llm_engine.get_model_config(), "dtype", "unknown")
@@ -91,9 +91,6 @@ def get_local_completions(
         prompts = [tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True, **tokenizer_kwargs)
                    for messages in messages_lists]
 
-    
-    # If show_progress is True, only show tqdm bar for actual inference, not for preparing prompts for inference
-    # use_tqdm = (lambda it, *a, **k: tqdm(it, *a, **k) if "Processed prompts" in k.get("desc", "") else it) if show_progress else False
     sampling_params = SamplingParams(max_tokens=max_tokens, temperature=temperature, **sampling_kwargs)
     outputs = engine.generate(
         prompts,
@@ -102,5 +99,4 @@ def get_local_completions(
     )
 
     completions = [str(out.outputs[0].text) for out in outputs]
-    print(completions[:10])
     return completions

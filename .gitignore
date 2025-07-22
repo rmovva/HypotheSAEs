@@ -6,7 +6,6 @@ emb_cache/*
 models/*
 wandb/*
 data/*
-experiments/*
 *checkpoints*
 *cache*
 notebooks/testing_notebook.ipynb

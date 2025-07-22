@@ -48,7 +48,7 @@ def _store_annotation(
     if concept not in results:
         results[concept] = {}
     results[concept][text] = annotation
-    if cache:
+    if cache is not None:
         cache[generate_cache_key(concept, text)] = annotation
 
 def parse_completion(completion: str) -> int:
@@ -210,7 +210,7 @@ def _local_annotate(
     if remaining_tasks:
         print(f"Assigning 0 to {len(remaining_tasks)} tasks that failed after {max_retries} retries")
         for text, concept in remaining_tasks:
-            _store_annotation(results, concept, text, 0, cache)
+            _store_annotation(results, concept, text, 0, cache=None) # Don't store failed annotations in cache
 
 def annotate(
     tasks: List[Tuple[str, str]],

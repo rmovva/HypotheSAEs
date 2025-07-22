@@ -34,13 +34,14 @@ def is_local_model(model: str) -> bool:
 
 def _sleep_all_except(active_model: Optional[str] = None) -> None:
     """Put every cached vLLM engine *except* `active` to sleep."""
-    for name, llm in _LOCAL_ENGINES.items():
+    for name, engine in _LOCAL_ENGINES.items():
         if name == active_model:
             continue
-        if llm.llm_engine.is_sleeping():
+        if engine.llm_engine.is_sleeping():
             continue
         print(f"Sleeping {name} to free GPU memory...")
-        llm.sleep(level=2) # Level 1 clears KV cache and moves weights to CPU; Level 2 clears cache + clears weights entirely
+        engine.llm_engine.reset_prefix_cache()
+        engine.sleep(level=2) # Level 1 clears KV cache and moves weights to CPU; Level 2 clears cache + clears weights entirely
 
 def _get_engine(model: str, **kwargs) -> LLM:
     """
@@ -67,6 +68,7 @@ def _get_engine(model: str, **kwargs) -> LLM:
         if engine.llm_engine.is_sleeping(): 
             print(f"Engine found for {model} but model is sleeping, waking up...")
             engine.wake_up()
+            engine.llm_engine.reset_prefix_cache()
 
     return engine
 
@@ -90,13 +92,14 @@ def get_local_completions(
 
     
     # If show_progress is True, only show tqdm bar for actual inference, not for preparing prompts for inference
-    use_tqdm = (lambda it, *a, **k: tqdm(it, *a, **k) if "Processed prompts" in k.get("desc", "") else it) if show_progress else False
+    # use_tqdm = (lambda it, *a, **k: tqdm(it, *a, **k) if "Processed prompts" in k.get("desc", "") else it) if show_progress else False
     sampling_params = SamplingParams(max_tokens=max_tokens, temperature=temperature, **sampling_kwargs)
     outputs = engine.generate(
         prompts,
         sampling_params=sampling_params,
-        use_tqdm=use_tqdm,
+        use_tqdm=show_progress,
     )
 
     completions = [str(out.outputs[0].text) for out in outputs]
+    print(completions[:10])
     return completions

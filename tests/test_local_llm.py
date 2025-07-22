@@ -32,7 +32,7 @@ def test_local_annotation():
     red_concept = "contains words associated with the color red"
     positive_tasks = [(text, blue_concept) for text in BLUE_SENTENCES] + [(text, red_concept) for text in RED_SENTENCES]
     negative_tasks = [(text, blue_concept) for text in RED_SENTENCES] + [(text, red_concept) for text in BLUE_SENTENCES]
-    results = annotate(positive_tasks + negative_tasks, model=LOCAL_LLM, show_progress=True, n_workers=1)
+    results = annotate(positive_tasks + negative_tasks, model=LOCAL_LLM, show_progress=True)
     
     # Calculate precision and recall for each concept
     for concept, concept_dict in results.items():

@@ -80,7 +80,7 @@ def get_local_completions(
     temperature: float = 0.7,
     show_progress: bool = True,
     tokenizer_kwargs: Optional[dict] = {},
-    sampling_kwargs: Optional[dict] = {},
+    llm_sampling_kwargs: Optional[dict] = {},
 ) -> List[str]:
     """Generate completions using vLLM with llm.generate()."""
     engine = _get_engine(model)
@@ -88,10 +88,11 @@ def get_local_completions(
 
     if getattr(tokenizer, "chat_template", None) is not None:
         messages_lists = [[{"role": "user", "content": p}] for p in prompts]
-        prompts = [tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True, **tokenizer_kwargs)
+        enable_thinking = tokenizer_kwargs.pop("enable_thinking", False) # Default to False so users don't get unexpected output
+        prompts = [tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True, enable_thinking=enable_thinking, **tokenizer_kwargs)
                    for messages in messages_lists]
 
-    sampling_params = SamplingParams(max_tokens=max_tokens, temperature=temperature, **sampling_kwargs)
+    sampling_params = SamplingParams(max_tokens=max_tokens, temperature=temperature, **llm_sampling_kwargs)
     outputs = engine.generate(
         prompts,
         sampling_params=sampling_params,

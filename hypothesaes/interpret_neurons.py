@@ -150,7 +150,7 @@ def sample_custom(
 class SamplingConfig:
     function: Callable = sample_top_zero
     n_examples: int = 20 # Number of examples to sample to prompt the interpreter
-    random_seed: Optional[int] = None # Random seed for example sampling
+    random_seed: Optional[int] = 0 # Base random seed for example sampling; each interp candidate increments this seed by 1
     max_words_per_example: Optional[int] = 256 # Maximum number of words per text example, truncated if necessary
     sampling_kwargs: Dict[str, Any] = field(default_factory=dict) # Extra keyword arguments for the sampling function
 
@@ -197,6 +197,7 @@ class NeuronInterpreter:
         texts: List[str],
         activations: np.ndarray,
         neuron_idx: int,
+        candidate_idx: int, # This is just used to ensure different sampling seeds for each candidate
         config: InterpretConfig,
     ) -> Optional[str]:
         """Return a fully-formatted prompt for a given neuron or ``None`` if the neuron is dead."""
@@ -210,7 +211,7 @@ class NeuronInterpreter:
             neuron_idx=neuron_idx,
             n_examples=config.sampling.n_examples,
             max_words_per_example=config.sampling.max_words_per_example,
-            random_seed=config.sampling.random_seed,
+            random_seed=config.sampling.random_seed + candidate_idx,
             **config.sampling.sampling_kwargs,
         )
 
@@ -332,11 +333,12 @@ class NeuronInterpreter:
 
         # Build prompts for every (neuron, candidate) pair
         prompts = []
-        for neuron_idx, _ in interpretation_tasks:
+        for neuron_idx, candidate_idx in interpretation_tasks:
             prompt = self._build_interpretation_prompt(
                 texts=texts,
                 activations=activations,
                 neuron_idx=neuron_idx,
+                candidate_idx=candidate_idx,
                 config=config,
             )
             prompts.append(prompt)

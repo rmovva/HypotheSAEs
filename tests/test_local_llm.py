@@ -6,7 +6,7 @@ from hypothesaes.annotate import annotate
 from .sentences import BLUE_SENTENCES, RED_SENTENCES, ALL_TEST_SENTENCES
 
 LOCAL_EMBEDDER = "sentence-transformers/all-MiniLM-L6-v2"
-LOCAL_LLM = "google/gemma-3-1b-it"
+LOCAL_LLM = "Qwen/Qwen3-8B"
 
 def test_local_interpretation():
     texts = BLUE_SENTENCES + RED_SENTENCES
@@ -18,7 +18,7 @@ def test_local_interpretation():
     interpreter = NeuronInterpreter(interpreter_model=LOCAL_LLM)
     config = InterpretConfig(
         sampling=SamplingConfig(n_examples=20),
-        llm=LLMConfig(max_interpretation_tokens=50, temperature=0.7),
+        llm=LLMConfig(max_interpretation_tokens=50, temperature=0.7, tokenizer_kwargs={"enable_thinking": False}),
     )
     results = interpreter.interpret_neurons(texts, activations, neuron_indices=[0, 1], config=config)
     print(f"Interpretations:\n - Neuron 0: {results[0][0]}\n - Neuron 1: {results[1][0]}")
@@ -32,7 +32,7 @@ def test_local_annotation():
     red_concept = "contains words associated with the color red"
     positive_tasks = [(text, blue_concept) for text in BLUE_SENTENCES] + [(text, red_concept) for text in RED_SENTENCES]
     negative_tasks = [(text, blue_concept) for text in RED_SENTENCES] + [(text, red_concept) for text in BLUE_SENTENCES]
-    results = annotate(positive_tasks + negative_tasks, model=LOCAL_LLM, show_progress=True)
+    results = annotate(positive_tasks + negative_tasks, model=LOCAL_LLM, show_progress=True, tokenizer_kwargs={"enable_thinking": False})
     
     # Calculate precision and recall for each concept
     for concept, concept_dict in results.items():

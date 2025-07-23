@@ -28,31 +28,32 @@ Please either open an issue, or contact us at rmovva@berkeley.edu and kennypeng@
 
 ## FAQ
 
-1. **What do I need to run HypotheSAEs?**  
-You need a dataset of texts (e.g., news headlines), a target variable (e.g., clicks) which is at least partially predictable from text*, and an OpenAI API key. Running the method will then output a list of natural language hypotheses: to be precise, these hypotheses are concepts which, when they appear in the text, are hypothesized to affect the target variable. (The hypothesis's coefficient determines the direction of the effect.)  
+1. **What are the inputs and outputs of HypotheSAEs?**  
+- **Inputs:** A dataset of texts (e.g., news headlines) with a target variable (e.g., clicks). The texts are embedded using SentenceTransformers or OpenAI.
+- **Outputs:** A list of hypotheses: each hypothesis is a natural language concept, which, when present in the text, is positively or negatively associated with the target variable.
 
 2. **How do I get started?**  
-See the [Quickstart](#quickstart) section. The easiest way to get started is to clone and install the repo, and then adapt the [quickstart notebook](https://github.com/rmovva/hypothesaes/blob/main/notebooks/quickstart.ipynb) to your dataset.
+See [Quickstart](#quickstart). The easiest way to get started is to clone and install the repo, and then adapt the [quickstart notebook](https://github.com/rmovva/hypothesaes/blob/main/notebooks/quickstart.ipynb) to your dataset.
 
-3. **Which LLMs can I use?**  
-Currently, **running HypotheSAEs requires using the OpenAI API**, at minimum to query LLMs for feature interpretation, but also optionally to compute text embeddings and evaluate hypothesis generalization. By default, we use GPT-4o for interpretation and GPT-4o-mini for concept annotation; these can be changed.
-We are working to expand compatibility to other model providers (Anthropic, Google Gemini, etc.): please send us a note if this is critical to your workflow so that we can prioritize it. 
-(Note that if data privacy is a concern, [upon request](https://help.openai.com/en/articles/8660679-how-can-i-get-a-business-associate-agreement-baa-with-openai-for-the-api-services), OpenAI may agree to a custom data retention policy.)
+3. **Why am I not getting any statistically significant hypotheses?**  
+HypotheSAEs identifies features in text embeddings that predict your target variable. Therefore, if your text embeddings do not predict your target variable _at all_, it's unlikely HypotheSAEs will find anything. To check this, before running the method, fit a simple linear model to predict your target from the text embeddings. If you see any signal on a heldout set, even if it's weak, it's worth running HypotheSAEs. However, if you see no signal at all, the method will probably not work well.
 
-4. **What tasks does HypotheSAEs support?**  
-Currently, the repo only supports **binary classification** and **regression** tasks. For target variables which have multiple categorical classes, we recommend using a one-vs-rest approach to convert the problem to binary classification. We hope to implement a feature selection method which natively supports multiclass classification in the future.  
+4. **Which LLMs can I use?**  
+You can use either (1) OpenAI LLMs with API calls or (2) local LLMs with vLLM. The default OpenAI LLMs are currently GPT-4.1 for interpreting SAE neurons and GPT-4.1-mini for annotating texts with concepts. The default local LLMs is Qwen3-14B, which requires a GPU with ~48GB memory (e.g., A6000). Please open an issue if you require different LLMs.
+
+5. **Do I need a GPU?**  
+- **If using OpenAI LLMs**: no, since all LLM use is via API calls. Training the SAE will be faster on GPU, but it shouldn't be prohibitively slow even on a laptop.  
+- **If using local LLMs**: yes, you will need a reasonable GPU for vLLM inference.
+
+6. **What other resources will I need?**  
+You'll need enough disk space to store your text embeddings, and enough RAM to load in the embeddings for SAE training. On an 8GB laptop, we started running out of RAM when trying to load in ~500K embeddings. It also should be possible to adapt the code to use a more efficient data loading strategy, so you don't need to fit everything in RAM.s
+
+7. **What types of prediction tasks does HypotheSAEs support?**  
+The repo supports **binary classification** and **regression** tasks. For **multiclass labels**, we recommend using a one-vs-rest approach to convert the problem to binary classification.    
 You can also use HypotheSAEs to study pairwise tasks (regression or classification), e.g., whether a news headline is more likely to be clicked on than another. See the [experiment reproduction notebook](https://github.com/rmovva/hypothesaes/blob/main/notebooks/experiment_reproduction.ipynb) for an example of this on the Headlines dataset.
 
-5. **How much does it cost?**  
-See the [Cost](#cost) section for an example breakdown.
-
-6. **Do I need a GPU?**  
-No, it should run on a laptop. Since we use API calls for LLM inference, GPUs won't help with that. GPUs *will* speed up SAE training, but we found that even on a laptop CPU, training doesn't take prohibitively long (i.e., minutes to hours). If it is too slow (e.g. your dataset is very large), you can (i) try subsampling your dataset or (ii) use Google Colab. 
-
-7. **What other resources will I need?**  
-You'll need enough disk space to store your text embeddings, and enough RAM to load in the embeddings for SAE training. On an 8GB laptop, we started running out of RAM when trying to load in ~500K embeddings.
-
-*You don't need _great_ predictions, just some signal above random chance. For example, predicting social media post engagement from text alone would have modest (but probably statistically significant) performance. To evaluate whether you have signal, you can first try training a simple linear model to predict the target variable from text embeddings. If you don't see _any_ predictive signal, HypotheSAEs is unlikely to be useful, since the method relies only in the information present on the input text representations.
+8. **If I use the OpenAI API, how much does HypotheSAEs cost?**  
+It's cheap (on the order of $1-10). See the [Cost](#cost) section for an example breakdown.
 
 ## Method
 

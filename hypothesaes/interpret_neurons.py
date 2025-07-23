@@ -228,17 +228,22 @@ class NeuronInterpreter:
     def _parse_interpretation(self, response: str) -> str:
         """Parse raw LLM response into clean interpretation string."""
         response = response.strip()
+        
+        # Handle incomplete response (i.e. if the model started thinking but didn't finish)
+        if '<think>' in response and '</think>' not in response:
+            return None
+        # Thinking completed
         if '</think>' in response:
             response = response.split('</think>')[1].strip()
-        if response.startswith('- '):
-            response = response[2:]
-        if response.startswith('"-'):
-            response = response[2:]
-        if response.startswith('" -'):
-            response = response[3:]
-        if '\n' in response:
-            response = response.split('\n')[0]
-        return response.strip('"')
+        
+        # Remove any prefixes
+        response = response.split('\n', 1)[0]
+        prefixes = ['- ', '"-', '" -']
+        for prefix in prefixes:
+            if response.startswith(prefix):
+                response = response[len(prefix):]
+        
+        return response.strip('"').strip()
  
     def _get_interpretation_openai(
         self,

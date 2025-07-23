@@ -35,7 +35,7 @@ def sample_top_zero(
     # Get indices of positive activations and take top n_per_class (or fewer if not enough positive)
     count_positive_activating = np.sum(neuron_acts > 0)
     if count_positive_activating < n_per_class:
-        print(f"Warning: Only found {count_positive_activating} examples with positive activation, using all available")
+        print(f"[WARNING] Only found {count_positive_activating} examples with positive activation, using all available")
         top_indices = np.argsort(neuron_acts)[-count_positive_activating:]
     else:
         top_indices = np.argsort(neuron_acts)[-n_per_class:]
@@ -45,7 +45,7 @@ def sample_top_zero(
     if len(zero_indices) >= n_per_class:
         random_indices = np.random.choice(zero_indices, size=n_per_class, replace=False)
     else:
-        print(f"Warning: Only found {len(zero_indices)} examples with zero activation, using all available")
+        print(f"[WARNING] Only found {len(zero_indices)} examples with zero activation, using all available")
         random_indices = zero_indices
     
     pos_texts = [texts[i] for i in top_indices]
@@ -89,7 +89,7 @@ def sample_percentile_bins(
     if len(high_indices) >= n_per_class:
         high_sample_indices = np.random.choice(high_indices, size=n_per_class, replace=False)
     else:
-        print(f"Warning: There are less than {n_per_class} examples in bin {high_percentile} for neuron {neuron_idx}; using {len(high_indices)} instead")
+        print(f"[WARNING] There are less than {n_per_class} examples in bin {high_percentile} for neuron {neuron_idx}; using {len(high_indices)} instead")
         high_sample_indices = high_indices
     
     if low_percentile is not None:
@@ -102,7 +102,7 @@ def sample_percentile_bins(
     if len(low_indices) >= n_per_class:
         low_sample_indices = np.random.choice(low_indices, size=n_per_class, replace=False)
     else:
-        print(f"Warning: There are less than {n_per_class} examples in bin {low_percentile} for neuron {neuron_idx}; using {len(low_indices)} instead")
+        print(f"[WARNING] There are less than {n_per_class} examples in bin {low_percentile} for neuron {neuron_idx}; using {len(low_indices)} instead")
         low_sample_indices = low_indices
     
     pos_texts = [texts[i] for i in high_sample_indices]
@@ -202,7 +202,7 @@ class NeuronInterpreter:
     ) -> Optional[str]:
         """Return a fully-formatted prompt for a given neuron or ``None`` if the neuron is dead."""
         if np.all(activations[:, neuron_idx] <= 0):
-            print(f"Warning: All activations for neuron {neuron_idx} are <= 0. This neuron may be dead. Skipping interpretation.")
+            print(f"[WARNING] All activations for neuron {neuron_idx} are <= 0. This neuron may be dead. Skipping interpretation.")
             return None
 
         formatted_examples = config.sampling.function(
@@ -394,7 +394,8 @@ class NeuronInterpreter:
         texts: List[str],
         activations: np.ndarray,
         interpretations: Dict[int, List[str]],
-        config: Optional[ScoringConfig] = None
+        config: Optional[ScoringConfig] = None,
+        show_progress: bool = True
     ) -> Dict[int, Dict[str, Dict[str, float]]]:
         """Score all interpretations for all neurons."""
         config = config or ScoringConfig()
@@ -423,18 +424,19 @@ class NeuronInterpreter:
             }
 
             for interp in neuron_interps:
+                if interp is None:
+                    continue
                 for text in eval_texts:
                     tasks.append((text, interp))
 
         # Annotate all tasks
-        progress_desc = f"Scoring neuron interpretation fidelity ({len(interpretations)} neurons; {len(next(iter(interpretations.values())))} candidate interps per neuron; {config.n_examples} examples to score each interp)"
-        
         cache_path = None if self.cache_name is None else os.path.join(CACHE_DIR, f"{self.cache_name}_interp-scoring.json")
+        progress_desc = f"Scoring neuron interpretation fidelity ({len(interpretations)} neurons; {len(next(iter(interpretations.values())))} candidate interps per neuron; {config.n_examples} examples to score each interp)"
         annotations = annotate(
             tasks=tasks,
             cache_path=cache_path,
             n_workers=self.n_workers_annotation,
-            show_progress=True,
+            show_progress=show_progress,
             model=self.annotator_model,
             progress_desc=progress_desc
         )
@@ -446,6 +448,9 @@ class NeuronInterpreter:
             neuron_scoring_info = scoring_info[neuron_idx]
 
             for interp in neuron_interps:
+                if interp is None:
+                    all_metrics[neuron_idx][interp] = {"recall": 0.0, "precision": 0.0, "f1": 0.0, "correlation": 0.0}
+                    continue
                 annot = [annotations[interp][text] for text in neuron_scoring_info['texts']]
                 all_metrics[neuron_idx][interp] = self._compute_metrics(
                     annotations=np.array(annot),

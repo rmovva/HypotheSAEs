@@ -160,7 +160,7 @@ def _local_annotate(
     max_tokens: int = 10,
     temperature: float = 0.0,
     max_retries: int = 3,
-    sampling_kwargs: Optional[dict] = {},
+    llm_sampling_kwargs: Optional[dict] = {},
     tokenizer_kwargs: Optional[dict] = {},
 ) -> None:
     """Annotate (text, concept) tasks with a local HF model, using a single
@@ -187,7 +187,7 @@ def _local_annotate(
             show_progress=show_progress and retry_count == 0,
             max_tokens=max_tokens,
             temperature=temperature,
-            sampling_kwargs=sampling_kwargs,
+            llm_sampling_kwargs=llm_sampling_kwargs,
             tokenizer_kwargs=tokenizer_kwargs,
         )
 
@@ -218,6 +218,8 @@ def annotate(
     cache_path: Optional[str] = None,
     n_workers: int = DEFAULT_N_WORKERS,
     show_progress: bool = True,
+    use_cache_only: bool = False,
+    uncached_value: int = 0,
     **kwargs
 ) -> Dict[Tuple[str, str], int]:
     """
@@ -229,6 +231,8 @@ def annotate(
         cache_path: Path to cache file
         n_workers: Number of workers for parallel processing
         show_progress: Whether to show progress bar
+        use_cache_only: Whether to only use the cache and set uncached items to uncached_value
+        uncached_value: Value to set for uncached items
         **kwargs: Additional arguments passed to annotate_single_text
     
     Returns:
@@ -246,8 +250,15 @@ def annotate(
         cache_key = generate_cache_key(concept, text)
         if cache_key in cache:
             results[concept][text] = cache[cache_key]
+        elif use_cache_only:
+            results[concept][text] = uncached_value
+            uncached_tasks.append((text, concept))
         else:
             uncached_tasks.append((text, concept))
+
+    if use_cache_only:
+        print(f"Found {len(tasks) - len(uncached_tasks)} cached items; mapped {len(uncached_tasks)} uncached items to {uncached_value}")
+        return results
 
     # Print cache statistics
     print(f"Found {len(tasks) - len(uncached_tasks)} cached items; annotating {len(uncached_tasks)} uncached items")

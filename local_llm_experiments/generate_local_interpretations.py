@@ -8,14 +8,19 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from hypothesaes.llm_local import _get_engine
-from hypothesaes import NeuronInterpreter, InterpretConfig, LLMConfig, SamplingConfig
+from hypothesaes.llm_local import _get_engine, is_local_model
+from hypothesaes.interpret_neurons import NeuronInterpreter, InterpretConfig, LLMConfig, SamplingConfig, sample_percentile_bins
 
 # Defaults ------------------------------------------------------------------
 
 ROOT = Path(__file__).resolve().parent.parent  # project root
 DATA_PATH = ROOT / "demo-data/yelp-demo-train-20K.json"
 ACTIVATIONS_PATH = ROOT / "local_llm_experiments/results/quickstart_sae/activations.npy"
+
+TASK_SPECIFIC_INSTRUCTIONS = """All of the texts are reviews of restaurants on Yelp.
+Features should describe a specific aspect of the review. For example:
+- "mentions long wait times to receive service"
+- "praises how a dish was cooked, with phrases like 'perfect medium-rare'\""""
 
 TEMPERATURE = 0.7
 THINKING_OPTIONS = [True, False]
@@ -43,47 +48,41 @@ INTERPRETATIONS_PATH = ROOT / "local_llm_experiments/results/interpretations.jso
 
 
 def append_timing(result: dict) -> None:
-    """Append result to file unless identical entry (ignoring time) already exists."""
-    try:
-        df = pd.read_json(TIMING_RESULTS_PATH, lines=True)
-    except (ValueError, FileNotFoundError):
-        df = pd.DataFrame()
-
-    key_cols = {k: v for k, v in result.items() if k != "time (s)"}
-    duplicate = (
-        not df.empty
-        and ((df.drop(columns=["time (s)"], errors="ignore") == pd.Series(key_cols)).all(axis=1)).any()
-    )
-    if duplicate:
-        print("Timing duplicate, skipping.")
-        return
-
+    """Append timing result as a JSON-line."""
     TIMING_RESULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(TIMING_RESULTS_PATH, "a") as f:
         f.write(json.dumps(result) + "\n")
 
 
-def run_sweep(model: str, texts: list[str], activations: np.ndarray) -> None:
+def run_sweep(model: str, texts: list[str], activations: np.ndarray, neurons_to_interpret: list[int], n_candidate_interpretations: int) -> None:
     """Generate 3 candidate interpretations per neuron using the specified model."""
-    _ = _get_engine(model)  # Pre-load the model into GPU memory with vLLM
+    if is_local_model(model):
+        _ = _get_engine(model)  # Pre-load the model into GPU memory with vLLM
 
     interpreter = NeuronInterpreter(interpreter_model=model)
-
     for thinking in THINKING_OPTIONS:
         # Skip combinations that require the special "thinking" tokenizer flag if the model doesn't support it
         if thinking and not any(x in model for x in ("Qwen", "SmolLM3")):
             continue
 
         print(f"MODEL: {model}, TEMPERATURE: {TEMPERATURE}, THINKING: {thinking}")
+        model_key = f"{model}_temp={TEMPERATURE}_think={thinking}"
 
+        max_tokens = 4096 if thinking else 75
         config = InterpretConfig(
-            sampling=SamplingConfig(n_examples=20),
+            sampling=SamplingConfig(
+                function=sample_percentile_bins,
+                n_examples=20,
+                sampling_kwargs={"high_percentile": (80, 100), "low_percentile": None},
+            ),
             llm=LLMConfig(
                 temperature=TEMPERATURE,
-                max_interpretation_tokens=50,
+                max_interpretation_tokens=max_tokens,
+                prompt_template="interpret-neuron-binary-reasoning" if thinking else "interpret-neuron-binary",
                 tokenizer_kwargs={"enable_thinking": thinking},
             ),
-            n_candidates=3,  # generate three interpretations per neuron
+            n_candidates=n_candidate_interpretations,  # generate three interpretations per neuron
+            task_specific_instructions=TASK_SPECIFIC_INSTRUCTIONS,
         )
 
         start_time = time.time()
@@ -91,23 +90,19 @@ def run_sweep(model: str, texts: list[str], activations: np.ndarray) -> None:
         interpretations = interpreter.interpret_neurons(
             texts=texts,
             activations=activations,
-            neuron_indices=list(range(activations.shape[1])),
+            neuron_indices=neurons_to_interpret,
             config=config,
         )
         duration = time.time() - start_time
 
-        # Only store timing if >10 seconds (avoid cached results)
-        if duration > 10:
-            timing_result = {
-                'time (s)': duration,
-                'model_name': model,
-                'temperature': TEMPERATURE,
-                'thinking': thinking,
-            }
-            append_timing(timing_result)
+        timing_result = {
+            'time (s)': round(duration, 1),
+            'model_name': model,
+            'temperature': TEMPERATURE,
+            'thinking': thinking,
+        }
+        append_timing(timing_result)
 
-        # Persist interpretations (one JSON per all models)
-        INTERPRETATIONS_PATH.parent.mkdir(parents=True, exist_ok=True)
         try:
             with open(INTERPRETATIONS_PATH, "r") as f:
                 all_interps = json.load(f)
@@ -116,19 +111,15 @@ def run_sweep(model: str, texts: list[str], activations: np.ndarray) -> None:
 
         # Convert neuron keys to str for JSON compatibility
         model_dict = {str(n): v for n, v in interpretations.items()}
-        all_interps[model] = model_dict
+        all_interps[model_key] = model_dict
 
         with open(INTERPRETATIONS_PATH, "w") as f:
-            json.dump(all_interps, f)
+            json.dump(all_interps, f, indent=2)
 
 
 def print_timing_table():
     """Print timing results table."""
-    try:
-        df = pd.read_json(TIMING_RESULTS_PATH, lines=True)
-    except (ValueError, FileNotFoundError):
-        return
-    
+    df = pd.read_json(TIMING_RESULTS_PATH, lines=True)
     print("\n" + "="*80)
     print("TIMING RESULTS:")
     print("="*80)
@@ -174,7 +165,10 @@ def main() -> None:
     if activations.shape[0] != len(texts):
         raise ValueError(f"Number of activations ({activations.shape[0]}) does not match number of texts ({len(texts)})")
 
-    run_sweep(args.model, texts, activations)
+    # neurons_to_interpret = list(range(activations.shape[1]))
+    neurons_to_interpret = [10, 11, 12, 13, 14, 150, 160, 170, 180, 190]
+    n_candidate_interpretations = 2
+    run_sweep(args.model, texts, activations, neurons_to_interpret, n_candidate_interpretations)
 
 
 if __name__ == "__main__":

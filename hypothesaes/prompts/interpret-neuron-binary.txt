@@ -19,6 +19,6 @@ Rules about the feature you identify:
 - The feature should be present in the positive samples and absent in the negative samples. Do not output a generic feature which also appears in negative samples.
 - The feature should be as specific as possible, while still applying to all of the positive samples. For example, if all of the positive samples mention Golden or Labrador retrievers, then the feature should be "mentions retriever dogs", not "mentions dogs" or "mentions Golden retrievers".
 
-Do not output anything else. Your response should be formatted exactly as shown in the examples above.
-Please suggest exactly one description, starting with "-" and surrounded by quotes "". Your response is:
+Do not output anything besides the feature. Your response should be formatted exactly as shown in the examples above.
+Please suggest exactly one feature, starting with "-" and surrounded by quotes "". Your response is:
 - "

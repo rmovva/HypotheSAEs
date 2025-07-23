@@ -5,6 +5,8 @@ import argparse
 import os, sys, json, time, subprocess
 from pathlib import Path
 
+os.environ["OPENAI_KEY_SAE"] = os.environ["OAI_GENERAL"]
+
 import numpy as np
 import pandas as pd
 
@@ -72,15 +74,15 @@ def run_sweep(model: str, texts: list[str], activations: np.ndarray, neurons_to_
         config = InterpretConfig(
             sampling=SamplingConfig(
                 function=sample_percentile_bins,
-                n_examples=20,
-                sampling_kwargs={"high_percentile": (80, 100), "low_percentile": None},
+                n_examples=10,
+                sampling_kwargs={"high_percentile": (90, 100), "low_percentile": (0, 10)},
             ),
             llm=LLMConfig(
                 temperature=TEMPERATURE,
                 max_interpretation_tokens=max_tokens,
-                prompt_template="interpret-neuron-binary-reasoning" if thinking else "interpret-neuron-binary",
                 tokenizer_kwargs={"enable_thinking": thinking},
             ),
+            prompt_name="interpret-neuron-binary-reasoning" if thinking else "interpret-neuron-binary",
             n_candidates=n_candidate_interpretations,  # generate three interpretations per neuron
             task_specific_instructions=TASK_SPECIFIC_INSTRUCTIONS,
         )

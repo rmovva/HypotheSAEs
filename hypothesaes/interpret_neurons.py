@@ -228,6 +228,8 @@ class NeuronInterpreter:
     def _parse_interpretation(self, response: str) -> str:
         """Parse raw LLM response into clean interpretation string."""
         response = response.strip()
+        if '</think>' in response:
+            response = response.split('</think>')[1].strip()
         if response.startswith('- '):
             response = response[2:]
         if response.startswith('"-'):

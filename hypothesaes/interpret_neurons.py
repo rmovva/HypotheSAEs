@@ -179,8 +179,8 @@ class ScoringConfig:
 class NeuronInterpreter:
     def __init__(
         self,
-        interpreter_model: str = "gpt-4o",
-        annotator_model: str = "gpt-4o-mini",
+        interpreter_model: str = "gpt-4.1",
+        annotator_model: str = "gpt-4.1-mini",
         n_workers_interpretation: int = 10,
         n_workers_annotation: int = 30,
         cache_name: Optional[str] = None,

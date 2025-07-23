@@ -247,12 +247,12 @@ def get_local_embeddings(
         for i in batch_iterator:
             batch = chunk_texts[i:i+batch_size]
             if "nomic-ai" in model:
-                batch = ["search_document: " + text for text in batch]
+                prefixed_batch = ["clustering: " + text for text in batch]
             elif "instructor" in model:
-                batch = [["Represent the text for classification: ", text] for text in batch]
+                prefixed_batch = [["Represent the text for classification: ", text] for text in batch]
             else:
-                batch = batch
-            batch_embs = transformer_model.encode(batch, batch_size=batch_size)
+                prefixed_batch = batch
+            batch_embs = transformer_model.encode(prefixed_batch, batch_size=batch_size)
             
             for text, embedding in zip(batch, batch_embs):
                 chunk_embeddings[text] = embedding

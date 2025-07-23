@@ -27,7 +27,7 @@ import sys
 # ---------------------------------------------------------------------------
 
 current_dir = os.getcwd()
-prefix = './' if current_dir.endswith("notebooks") else '../'
+prefix = './' if current_dir.endswith("HypotheSAEs") else '../'
 DATA_PATH = os.path.join(prefix, "demo-data", "yelp-demo-val-2K.json")
 
 CONCEPTS = [
@@ -58,7 +58,7 @@ MODELS = [
     "google/gemma-3-12b-it",
     "Qwen/Qwen3-14B",
 ]
-TIMING_RESULTS_PATH = os.path.join(CACHE_DIR, "timing_results.jsonl")
+TIMING_RESULTS_PATH = os.path.join('.', 'results', "timing_results_annotation.jsonl")
 
 
 def build_tasks(df: pd.DataFrame) -> list[tuple[str, str]]:

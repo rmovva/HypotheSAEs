@@ -156,7 +156,7 @@ class SamplingConfig:
 
 @dataclass
 class LLMConfig:
-    temperature: float = 0.7 # Temperature for the interpreter model
+    temperature: Optional[float] = None # Temperature for the interpreter model
     max_interpretation_tokens: int = 100 # Maximum number of tokens for each generated interpretation
     timeout: float = 10.0 # Timeout for the interpreter model (in seconds)
     tokenizer_kwargs: Dict[str, Any] = field(default_factory=dict) # Extra keyword arguments for the tokenizer, such as "enable_thinking"
@@ -289,9 +289,9 @@ class NeuronInterpreter:
             raw_responses = get_local_completions(
                 valid_prompts,
                 model=self.interpreter_model,
-                max_tokens=config.llm.max_interpretation_tokens,
-                temperature=config.llm.temperature,
                 tokenizer_kwargs=config.llm.tokenizer_kwargs,
+                max_tokens=config.llm.max_interpretation_tokens,
+                llm_sampling_kwargs={"temperature": config.llm.temperature},
             )
             return [self._parse_interpretation(r) for r in raw_responses]
 

@@ -157,8 +157,8 @@ def _local_annotate(
     show_progress: bool = True,
     max_words_per_example: Optional[int] = None,
     prompt_template_name: str = "annotate-simple",
-    max_tokens: int = 10,
-    temperature: float = 0.0,
+    max_tokens: int = 3,
+    temperature: Optional[float] = None,
     max_retries: int = 3,
     llm_sampling_kwargs: Optional[dict] = {},
     tokenizer_kwargs: Optional[dict] = {},
@@ -181,12 +181,14 @@ def _local_annotate(
             mapping.append((text, concept))
 
         # Get annotation completions with local LLM
+        if temperature is not None:
+            llm_sampling_kwargs["temperature"] = temperature
+
         completions = get_local_completions(
             prompts,
             model=model,
             show_progress=show_progress and retry_count == 0,
             max_tokens=max_tokens,
-            temperature=temperature,
             llm_sampling_kwargs=llm_sampling_kwargs,
             tokenizer_kwargs=tokenizer_kwargs,
         )

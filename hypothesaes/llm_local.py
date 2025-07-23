@@ -58,7 +58,7 @@ def _get_engine(model: str, **kwargs) -> LLM:
 
         print(f"Loading {model} in vLLM...")
         t0 = time.time()
-        gpu_memory_utilization = kwargs.pop("gpu_memory_utilization", 0.8)
+        gpu_memory_utilization = kwargs.pop("gpu_memory_utilization", 0.9)
         engine = LLM(model=model, task="generate", enable_sleep_mode=True, gpu_memory_utilization=gpu_memory_utilization, **kwargs)
         _LOCAL_ENGINES[model] = engine
         dtype = getattr(engine.llm_engine.get_model_config(), "dtype", "unknown")
@@ -77,7 +77,6 @@ def get_local_completions(
     prompts: List[str],
     model: str = "Qwen/Qwen3-0.6B",
     max_tokens: int = 128,
-    temperature: float = 0.7,
     show_progress: bool = True,
     tokenizer_kwargs: Optional[dict] = {},
     llm_sampling_kwargs: Optional[dict] = {},
@@ -92,7 +91,7 @@ def get_local_completions(
         prompts = [tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True, enable_thinking=enable_thinking, **tokenizer_kwargs)
                    for messages in messages_lists]
 
-    sampling_params = SamplingParams(max_tokens=max_tokens, temperature=temperature, **llm_sampling_kwargs)
+    sampling_params = SamplingParams(max_tokens=max_tokens, **llm_sampling_kwargs)
     outputs = engine.generate(
         prompts,
         sampling_params=sampling_params,

@@ -111,14 +111,14 @@ def _parallel_annotate(
     cache: Optional[dict] = None,
     progress_desc: str = "Annotating",
     show_progress: bool = True,
-    **kwargs
+    **annotation_kwargs
 ) -> None:
     # Keep track of tasks that need to be retried
     retry_tasks = []
     
     with concurrent.futures.ThreadPoolExecutor(max_workers=n_workers) as executor:
         future_to_task = {
-            executor.submit(annotate_single_text, text=text, concept=concept, model=model, **kwargs): 
+            executor.submit(annotate_single_text, text=text, concept=concept, model=model, **annotation_kwargs): 
             (text, concept)
             for text, concept in tasks
         }
@@ -143,7 +143,7 @@ def _parallel_annotate(
         print(f"Retrying {len(retry_tasks)} failed tasks...")
         for text, concept in retry_tasks:
             try:
-                annotation, _ = annotate_single_text(text=text, concept=concept, model=model, **kwargs)
+                annotation, _ = annotate_single_text(text=text, concept=concept, model=model, **annotation_kwargs)
                 if annotation is not None:
                     _store_annotation(results, concept, text, annotation, cache)
             except Exception as e:
@@ -222,7 +222,7 @@ def annotate(
     show_progress: bool = True,
     use_cache_only: bool = False,
     uncached_value: int = 0,
-    **kwargs
+    **annotation_kwargs
 ) -> Dict[Tuple[str, str], int]:
     """
     Annotate a list of (text, concept) tasks.
@@ -235,7 +235,7 @@ def annotate(
         show_progress: Whether to show progress bar
         use_cache_only: Whether to only use the cache and set uncached items to uncached_value
         uncached_value: Value to set for uncached items
-        **kwargs: Additional arguments passed to annotate_single_text
+        **annotation_kwargs: Additional arguments passed to annotate_single_text
     
     Returns:
         Dictionary mapping (text, concept) to annotation result
@@ -274,7 +274,7 @@ def annotate(
                 cache=cache,
                 results=results,
                 show_progress=show_progress,
-                **kwargs,
+                **annotation_kwargs,
             )
         else:
             _parallel_annotate(
@@ -284,7 +284,7 @@ def annotate(
                 cache=cache,
                 results=results,
                 show_progress=show_progress,
-                **kwargs
+                **annotation_kwargs
             )
 
     # Save cache if path provided
@@ -300,7 +300,7 @@ def annotate_texts_with_concepts(
     cache_name: Optional[str] = None,
     progress_desc: str = "Annotating",
     show_progress: bool = True,
-    **kwargs
+    **annotation_kwargs
 ) -> Dict[str, np.ndarray]:
     """
     Annotate all texts in a list with all concepts in a list.
@@ -315,10 +315,10 @@ def annotate_texts_with_concepts(
         tasks=tasks,
         model=model,
         cache_path=os.path.join(CACHE_DIR, f"{cache_name}_hypothesis-eval.json") if cache_name else None,
-        n_workers=kwargs.pop('n_workers', DEFAULT_N_WORKERS),
+        n_workers=annotation_kwargs.pop('n_workers', DEFAULT_N_WORKERS),
         show_progress=show_progress,
         progress_desc=progress_desc,
-        **kwargs
+        **annotation_kwargs
     )
     
     # Reorganize results into arrays per concept

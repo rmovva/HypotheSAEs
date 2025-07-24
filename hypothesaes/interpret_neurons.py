@@ -396,7 +396,8 @@ class NeuronInterpreter:
         activations: np.ndarray,
         interpretations: Dict[int, List[str]],
         config: Optional[ScoringConfig] = None,
-        show_progress: bool = True
+        show_progress: bool = True,
+        **annotation_kwargs
     ) -> Dict[int, Dict[str, Dict[str, float]]]:
         """Score all interpretations for all neurons."""
         config = config or ScoringConfig()
@@ -439,7 +440,8 @@ class NeuronInterpreter:
             n_workers=self.n_workers_annotation,
             show_progress=show_progress,
             model=self.annotator_model,
-            progress_desc=progress_desc
+            progress_desc=progress_desc,
+            **annotation_kwargs
         )
 
         # Compute metrics for all interpretations

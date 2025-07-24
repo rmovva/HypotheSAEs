@@ -166,7 +166,7 @@ class InterpretConfig:
     sampling: SamplingConfig = field(default_factory=SamplingConfig)
     llm: LLMConfig = field(default_factory=LLMConfig)
     n_candidates: int = 1 # Number of candidate interpretations per neuron
-    prompt_name: str = "interpret-neuron-binary" # Name of the prompt template file to use
+    interpretation_prompt_name: str = "interpret-neuron-binary" # Name of the prompt template file to use
     task_specific_instructions: str = DEFAULT_TASK_SPECIFIC_INSTRUCTIONS # Task-specific instructions for the interpreter model
 
 @dataclass
@@ -216,8 +216,8 @@ class NeuronInterpreter:
         )
 
         try:
-            prompt_template = load_prompt(config.prompt_name)
-            prompt = prompt_template.format(
+            interpretation_prompt_template = load_prompt(config.interpretation_prompt_name)
+            prompt = interpretation_prompt_template.format(
                 task_specific_instructions=config.task_specific_instructions,
                 **formatted_examples
             )

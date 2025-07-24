@@ -60,7 +60,7 @@ def parse_completion(completion: str) -> int:
 def annotate_single_text(
     text: str,
     concept: str,
-    prompt_template_name: str = "annotate",
+    annotate_prompt_name: str = "annotate",
     model: str = "gpt-4o-mini",
     max_words_per_example: Optional[int] = None,
     temperature: float = 0.0,
@@ -75,8 +75,8 @@ def annotate_single_text(
     if max_words_per_example:
         text = truncate_text(text, max_words_per_example)
         
-    prompt_template = load_prompt(prompt_template_name)
-    prompt = prompt_template.format(hypothesis=concept, text=text)
+    annotate_prompt = load_prompt(annotate_prompt_name)
+    prompt = annotate_prompt.format(hypothesis=concept, text=text)
     
     total_api_time = 0.0
     for attempt in range(max_retries):
@@ -156,7 +156,7 @@ def _local_annotate(
     model: str = "Qwen/Qwen3-0.6B",
     show_progress: bool = True,
     max_words_per_example: Optional[int] = None,
-    prompt_template_name: str = "annotate-simple",
+    annotate_prompt_name: str = "annotate-simple",
     max_tokens: int = 3,
     temperature: Optional[float] = None,
     max_retries: int = 3,
@@ -166,7 +166,7 @@ def _local_annotate(
     """Annotate (text, concept) tasks with a local HF model, using a single
     call to `get_local_completions`.
     """
-    prompt_template = load_prompt(prompt_template_name)
+    annotate_prompt = load_prompt(annotate_prompt_name)
     remaining_tasks = tasks.copy()
     
     for retry_count in range(max_retries + 1):
@@ -177,7 +177,7 @@ def _local_annotate(
         prompts, mapping = [], []
         for text, concept in remaining_tasks:
             truncated_text = truncate_text(text, max_words_per_example) # If None, no truncation
-            prompts.append(prompt_template.format(hypothesis=concept, text=truncated_text))
+            prompts.append(annotate_prompt.format(hypothesis=concept, text=truncated_text))
             mapping.append((text, concept))
 
         # Get annotation completions with local LLM

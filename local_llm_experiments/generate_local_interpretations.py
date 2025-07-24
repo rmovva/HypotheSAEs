@@ -14,42 +14,37 @@ from hypothesaes.llm_local import _get_engine, is_local_model
 from hypothesaes.interpret_neurons import NeuronInterpreter, InterpretConfig, LLMConfig, SamplingConfig, sample_percentile_bins
 
 # Defaults ------------------------------------------------------------------
+M, K = 1024, 32
 
 ROOT = Path('/nas/ucb/rmovva/data/hypothesaes')
 DATA_PATH = ROOT / "hypothesis-generation-data/yelp/train-200K.json"
-ACTIVATIONS_PATH = ROOT / "local_llm_experiments/results/quickstart_sae/activations.npy"
+ACTIVATIONS_PATH = ROOT / f"local_llm_experiments/checkpoints/activations_{M}_{K}.npy"
 
 TASK_SPECIFIC_INSTRUCTIONS = """All of the texts are reviews of restaurants on Yelp.
 Features should describe a specific aspect of the review. For example:
 - "mentions long wait times to receive service"
 - "praises how a dish was cooked, with phrases like 'perfect medium-rare'\""""
 
-THINKING_OPTIONS = [False]#, True]
+THINKING_OPTIONS = [False, True]
 
 # ---------------------------------------------------------------------------
 # List of models to sweep when no --model argument is provided
 # ---------------------------------------------------------------------------
 MODELS = [
-    # "Qwen/Qwen3-0.6B",
-    # "HuggingFaceTB/SmolLM3-3B",
-    # "meta-llama/Llama-3.2-3B-Instruct",
-    # "Qwen/Qwen3-4B",
-    # "mistralai/Mistral-7B-Instruct-v0.3",
-    # "meta-llama/Llama-3.1-8B-Instruct",
-    # "Qwen/Qwen3-8B",
-    # "Qwen/Qwen3-14B",
-    # "Qwen/Qwen3-32B-FP8",
+    "Qwen/Qwen3-8B",
+    "Qwen/Qwen3-8B-AWQ",
+    "Qwen/Qwen3-14B",
+    "Qwen/Qwen3-14B-AWQ",
+    "Qwen/Qwen3-32B",
     "Qwen/Qwen3-32B-AWQ",
-    # "Qwen3-30B-A3B-FP8",
-    # "Qwen/Qwen3-32B",
     #
-    # "gpt-4.1",
-    # "gpt-4.1-mini",
-    # "gpt-4.1-nano",
-    # "gpt-4o",
+    "gpt-4.1",
+    "gpt-4.1-mini",
+    "gpt-4.1-nano",
+    "gpt-4o",
 ]
-TIMING_RESULTS_PATH = ROOT / "local_llm_experiments/results/timing_results_interpretation.jsonl"
-INTERPRETATIONS_PATH = ROOT / "local_llm_experiments/results/interpretations.json"
+TIMING_RESULTS_PATH = ROOT / f"local_llm_experiments/results/interpretation_timing_results_{M}_{K}.jsonl"
+INTERPRETATIONS_PATH = ROOT / f"local_llm_experiments/results/interpretations_{M}_{K}.json"
 
 
 def append_timing(result: dict) -> None:
@@ -78,7 +73,7 @@ def run_sweep(model: str, texts: list[str], activations: np.ndarray, neurons_to_
             sampling=SamplingConfig(
                 function=sample_percentile_bins,
                 n_examples=10,
-                sampling_kwargs={"high_percentile": (90, 100), "low_percentile": (0, 10)},
+                sampling_kwargs={"high_percentile": (80, 100), "low_percentile": None},
             ),
             llm=LLMConfig(
                 max_interpretation_tokens=max_tokens,
@@ -168,9 +163,9 @@ def main() -> None:
     if activations.shape[0] != len(texts):
         raise ValueError(f"Number of activations ({activations.shape[0]}) does not match number of texts ({len(texts)})")
 
-    neurons_to_interpret = list(range(activations.shape[1]))
-    neurons_to_interpret = [10, 11, 12, 13, 14, 150, 160, 170, 180, 190]
-    n_candidate_interpretations = 1
+    n_neurons_to_interpret = 256
+    neurons_to_interpret = np.random.choice(activations.shape[1], size=n_neurons_to_interpret, replace=False).tolist()
+    n_candidate_interpretations = 3
     run_sweep(args.model, texts, activations, neurons_to_interpret, n_candidate_interpretations)
 
 

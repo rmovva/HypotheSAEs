@@ -285,13 +285,14 @@ class NeuronInterpreter:
             return []
 
         # For local models (vLLM), use a single call to get_local_completions
+        llm_sampling_kwargs = {"temperature": config.llm.temperature} if config.llm.temperature is not None else {}
         if is_local_model(self.interpreter_model):
             raw_responses = get_local_completions(
                 valid_prompts,
                 model=self.interpreter_model,
                 tokenizer_kwargs=config.llm.tokenizer_kwargs,
                 max_tokens=config.llm.max_interpretation_tokens,
-                llm_sampling_kwargs={"temperature": config.llm.temperature},
+                llm_sampling_kwargs=llm_sampling_kwargs,
             )
             return [self._parse_interpretation(r) for r in raw_responses]
 

@@ -19,24 +19,27 @@ M, K = 1024, 32
 ROOT = Path('/nas/ucb/rmovva/data/hypothesaes')
 DATA_PATH = ROOT / "hypothesis-generation-data/yelp/train-200K.json"
 ACTIVATIONS_PATH = ROOT / f"local_llm_experiments/checkpoints/activations_{M}_{K}.npy"
+NEURON_SELECTION_SEED = 42
+N_NEURONS_TO_INTERPRET = 256
+N_CANDIDATE_INTERPRETATIONS = 3
 
 TASK_SPECIFIC_INSTRUCTIONS = """All of the texts are reviews of restaurants on Yelp.
 Features should describe a specific aspect of the review. For example:
 - "mentions long wait times to receive service"
 - "praises how a dish was cooked, with phrases like 'perfect medium-rare'\""""
 
-THINKING_OPTIONS = [False, True]
+THINKING_OPTIONS = [True, False]
 
 # ---------------------------------------------------------------------------
 # List of models to sweep when no --model argument is provided
 # ---------------------------------------------------------------------------
 MODELS = [
-    "Qwen/Qwen3-8B",
     "Qwen/Qwen3-8B-AWQ",
-    "Qwen/Qwen3-14B",
+    "Qwen/Qwen3-8B",
     "Qwen/Qwen3-14B-AWQ",
-    "Qwen/Qwen3-32B",
+    "Qwen/Qwen3-14B",
     "Qwen/Qwen3-32B-AWQ",
+    "Qwen/Qwen3-32B",
     #
     "gpt-4.1",
     "gpt-4.1-mini",
@@ -160,13 +163,11 @@ def main() -> None:
     texts = df["text"].tolist()
     activations = np.load(args.activations)
 
+    neurons_to_interpret = np.random.RandomState(NEURON_SELECTION_SEED).choice(activations.shape[1], size=N_NEURONS_TO_INTERPRET, replace=False).tolist()
     if activations.shape[0] != len(texts):
         raise ValueError(f"Number of activations ({activations.shape[0]}) does not match number of texts ({len(texts)})")
 
-    n_neurons_to_interpret = 256
-    neurons_to_interpret = np.random.choice(activations.shape[1], size=n_neurons_to_interpret, replace=False).tolist()
-    n_candidate_interpretations = 3
-    run_sweep(args.model, texts, activations, neurons_to_interpret, n_candidate_interpretations)
+    run_sweep(args.model, texts, activations, neurons_to_interpret, N_CANDIDATE_INTERPRETATIONS)
 
 
 if __name__ == "__main__":

@@ -108,7 +108,6 @@ def interpret_sae(
     neuron_indices: Optional[List[int]] = None,
     n_random_neurons: Optional[int] = None,
     interpreter_model: str = "gpt-4o",
-    annotator_model: str = "gpt-4o-mini",
     n_examples_for_interpretation: int = 20,
     max_words_per_example: int = 256,
     interpret_temperature: float = 0.7,
@@ -127,7 +126,6 @@ def interpret_sae(
         neuron_indices: Specific neuron indices to interpret (mutually exclusive with n_random_neurons)
         n_random_neurons: Number of random neurons to interpret (mutually exclusive with neuron_indices)
         interpreter_model: LLM to use for generating interpretations
-        annotator_model: LLM to use for scoring interpretations
         n_examples: Number of examples to use for interpretation
         max_words_per_example: Maximum words per text to prompt the interpreter LLM with
         temperature: Temperature for LLM generation
@@ -163,7 +161,6 @@ def interpret_sae(
     # Set up interpreter
     interpreter = NeuronInterpreter(
         interpreter_model=interpreter_model,
-        annotator_model=annotator_model,
     )
 
     interpret_config = InterpretConfig(

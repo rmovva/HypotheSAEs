@@ -208,6 +208,8 @@ def get_local_embeddings(
 ) -> Dict[str, np.ndarray]:
     """Get embeddings using local SentenceTransformer model with chunked caching."""
     from sentence_transformers import SentenceTransformer
+    import torch
+    import gc
 
     # Filter out None values and empty strings
     texts = filter_invalid_texts(texts)
@@ -260,5 +262,10 @@ def get_local_embeddings(
         
         # Save completed chunk
         next_chunk_idx = _save_embedding_chunk(cache_name, chunk_embeddings, next_chunk_idx)
+
+    del transformer_model
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
     
     return text2embedding

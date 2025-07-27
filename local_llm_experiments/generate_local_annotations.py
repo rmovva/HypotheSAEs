@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Sweep annotate cache builder.
+Generate annotations for local LLMs & OpenAI LLMs to benchmark annotation quality relative to gpt-4.1.
 
 Example
 -------
@@ -16,7 +16,6 @@ import pickle
 import numpy as np
 import pandas as pd
 from hypothesaes.annotate import annotate
-from hypothesaes.annotate import CACHE_DIR
 from hypothesaes.llm_local import _get_engine
 
 from pathlib import Path
@@ -106,7 +105,6 @@ def run_sweep(model: str, tasks: list[tuple[str, str]]) -> None:
         print(f"MODEL: {model}, THINKING: {thinking}")
 
         max_tokens = 512 if thinking else 3
-        cache_path = os.path.join(CACHE_DIR, f'test_{model}_think={thinking}.json')
 
         start_time = time.time()
         annotations = annotate(
@@ -117,7 +115,6 @@ def run_sweep(model: str, tasks: list[tuple[str, str]]) -> None:
             prompt_template_name="annotate-simple",
             tokenizer_kwargs={"enable_thinking": thinking},
             max_retries=3,
-            cache_path=cache_path,
         )
         duration = time.time() - start_time
         if duration > 10:

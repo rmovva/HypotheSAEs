@@ -112,7 +112,7 @@ def run_sweep(model: str, tasks: list[tuple[str, str]]) -> None:
             model=model,
             max_words_per_example=256,
             max_tokens=max_tokens,
-            prompt_template_name="annotate-simple",
+            annotate_prompt_name="annotate-simple",
             tokenizer_kwargs={"enable_thinking": thinking},
             max_retries=3,
         )

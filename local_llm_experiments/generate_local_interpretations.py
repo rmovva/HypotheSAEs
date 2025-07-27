@@ -2,10 +2,8 @@
 """Generate three SAE-neuron interpretations per model/setting and record runtime."""
 
 import argparse
-import os, sys, json, time, subprocess
+import sys, json, time, subprocess
 from pathlib import Path
-
-os.environ["OPENAI_KEY_SAE"] = os.environ["OAI_GENERAL"]
 
 import numpy as np
 import pandas as pd

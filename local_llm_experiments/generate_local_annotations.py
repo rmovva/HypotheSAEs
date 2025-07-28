@@ -108,15 +108,25 @@ def run_sweep(model: str, tasks: list[tuple[str, str]]) -> None:
         max_tokens = 512 if thinking else 3
 
         start_time = time.time()
-        annotations = annotate(
-            tasks,
-            model=model,
-            max_words_per_example=256,
-            max_tokens=max_tokens,
-            annotate_prompt_name="annotate-simple",
-            tokenizer_kwargs={"enable_thinking": thinking},
-            max_retries=3,
-        )
+        if 'gpt' in model:
+            annotations = annotate(
+                tasks,
+                model=model,
+                max_words_per_example=256,
+                max_tokens=max_tokens,
+                annotate_prompt_name="annotate-simple",
+                max_retries=3,
+            )
+        else:
+            annotations = annotate(
+                tasks,
+                model=model,
+                max_words_per_example=256,
+                max_tokens=max_tokens,
+                annotate_prompt_name="annotate-simple",
+                max_retries=3,
+                tokenizer_kwargs={"enable_thinking": thinking},
+            )
         duration = time.time() - start_time
         if duration > 10:
             timing_result = {

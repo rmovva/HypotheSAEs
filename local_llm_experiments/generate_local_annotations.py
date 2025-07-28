@@ -16,7 +16,7 @@ import pickle
 import numpy as np
 import pandas as pd
 from hypothesaes.annotate import annotate
-from hypothesaes.llm_local import _get_engine
+from hypothesaes.llm_local import get_vllm_engine
 
 from pathlib import Path
 import subprocess
@@ -95,7 +95,7 @@ def run_sweep(model: str, tasks: list[tuple[str, str]]) -> None:
 
     Stores timing information and saves the annotations produced by each model.
     """
-    _ = _get_engine(model)  # Pre-load the model into GPU memory with vLLM
+    _ = get_vllm_engine(model)  # Pre-load the model into GPU memory with vLLM
 
     for thinking in THINKING_OPTIONS:
         # Skip combinations that require special "thinking" tokenizer flag if the model doesn't support it

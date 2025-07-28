@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from hypothesaes.llm_local import _get_engine, is_local_model
+from hypothesaes.llm_local import get_vllm_engine, is_local_model
 from hypothesaes.interpret_neurons import NeuronInterpreter, InterpretConfig, LLMConfig, SamplingConfig, sample_percentile_bins
 
 # Defaults ------------------------------------------------------------------
@@ -58,7 +58,7 @@ def append_timing(result: dict) -> None:
 def run_sweep(model: str, texts: list[str], activations: np.ndarray, neurons_to_interpret: list[int], n_candidate_interpretations: int) -> None:
     """Generate 3 candidate interpretations per neuron using the specified model."""
     if is_local_model(model):
-        _ = _get_engine(model)  # Pre-load the model into GPU memory with vLLM
+        _ = get_vllm_engine(model)  # Pre-load the model into GPU memory with vLLM
 
     interpreter = NeuronInterpreter(interpreter_model=model)
     for thinking in THINKING_OPTIONS:

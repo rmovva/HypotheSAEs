@@ -220,6 +220,7 @@ def annotate(
     cache_path: Optional[str] = None,
     n_workers: int = DEFAULT_N_WORKERS,
     show_progress: bool = True,
+    progress_desc: str = "Annotating",
     use_cache_only: bool = False,
     uncached_value: int = 0,
     **annotation_kwargs
@@ -284,6 +285,7 @@ def annotate(
                 cache=cache,
                 results=results,
                 show_progress=show_progress,
+                progress_desc=progress_desc,
                 **annotation_kwargs
             )
 

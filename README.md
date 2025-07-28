@@ -43,7 +43,7 @@ You can use either (1) OpenAI LLMs with API calls or (2) local LLMs with vLLM. T
 
 5. **Do I need a GPU?**  
 - **If using OpenAI LLMs**: no, since all LLM use is via API calls. Training the SAE will be faster on GPU, but it shouldn't be prohibitively slow even on a laptop.  
-- **If using local LLMs**: yes, you will need a reasonable GPU for vLLM inference.
+- **If using local LLMs**: yes, you will need a reasonable GPU for LLM inference.
 
 6. **What other resources will I need?**  
 You'll need enough disk space to store your text embeddings, and enough RAM to load in the embeddings for SAE training. On an 8GB laptop, we started running out of RAM when trying to load in ~500K embeddings. It also should be possible to adapt the code to use a more efficient data loading strategy, so you don't need to fit everything in RAM.s

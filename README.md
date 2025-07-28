@@ -30,7 +30,7 @@ Please either open an issue, or contact us at rmovva@berkeley.edu and kennypeng@
 
 1. **What are the inputs and outputs of HypotheSAEs?**  
 - **Inputs:** A dataset of texts (e.g., news headlines) with a target variable (e.g., clicks). The texts are embedded using SentenceTransformers or OpenAI.
-- **Outputs:** A list of hypotheses: each hypothesis is a natural language concept, which, when present in the text, is positively or negatively associated with the target variable.
+- **Outputs:** A list of hypotheses. Each hypothesis is a natural language concept, which, when present in the text, is positively or negatively associated with the target variable.
 
 2. **How do I get started?**  
 See [Quickstart](#quickstart). The easiest way to get started is to clone and install the repo, and then adapt the [quickstart notebook](https://github.com/rmovva/hypothesaes/blob/main/notebooks/quickstart.ipynb) to your dataset.
@@ -39,7 +39,7 @@ See [Quickstart](#quickstart). The easiest way to get started is to clone and in
 HypotheSAEs identifies features in text embeddings that predict your target variable. Therefore, if your text embeddings do not predict your target variable _at all_, it's unlikely HypotheSAEs will find anything. To check this, before running the method, fit a simple linear model to predict your target from the text embeddings. If you see any signal on a heldout set, even if it's weak, it's worth running HypotheSAEs. However, if you see no signal at all, the method will probably not work well.
 
 4. **Which LLMs can I use?**  
-You can use either (1) OpenAI LLMs with API calls or (2) local LLMs with vLLM. The default OpenAI LLMs are currently GPT-4.1 for interpreting SAE neurons and GPT-4.1-mini for annotating texts with concepts. The default local LLMs is Qwen3-14B, which requires a GPU with ~48GB memory (e.g., A6000). Please open an issue if you require different LLMs.
+You can use either (1) OpenAI LLMs with API calls or (2) local LLMs with vLLM. The default OpenAI LLMs are currently GPT-4.1 for interpreting SAE neurons and GPT-4.1-mini for annotating texts with concepts. The default local LLMs is Qwen3-32B-AWQ, which requires a GPU with ~48GB memory (e.g., A6000). Please open an issue if you require different LLMs.
 
 5. **Do I need a GPU?**  
 - **If using OpenAI LLMs**: no, since all LLM use is via API calls. Training the SAE will be faster on GPU, but it shouldn't be prohibitively slow even on a laptop.  
@@ -94,9 +94,13 @@ Note: If using this option, you'll need to separately download any example noteb
 
 ## Quickstart
 
-**See `notebooks/quickstart.ipynb` for a complete working example** on a subset of the Yelp restaurant review dataset. The input is review text and the target variable is 1-5 star rating. For many use cases, adapting this notebook should be sufficient. 
+**See [`notebooks/quickstart.ipynb`](https://github.com/rmovva/hypothesaes/blob/main/notebooks/quickstart.ipynb) for a complete working example** on using OpenAI models, or **[`notebooks/quickstart_local.ipynb`](https://github.com/rmovva/hypothesaes/blob/main/notebooks/quickstart_local.ipynb)** for an equivalent version using local LLMs (serves models on your local GPU with vLLM). The quickstart notebooks use a subset of the Yelp restaurant review dataset, where the input is review text and the target variable is 1-5 star rating.  
 
-We also walk through the steps of the quickstart notebook below.  
+For many use cases, adapting the quickstart notebook should be sufficient.
+
+### Walkthrough
+
+We explain the key steps of the OpenAI quickstart notebook below. Note that the quickstart notebooks themselves also contain substantial documentation.
 
 0. **Set your OpenAI API key** as an environment variable:
 ```bash

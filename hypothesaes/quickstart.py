@@ -197,7 +197,7 @@ def interpret_sae(
         if print_examples_n > 0:
             top_indices = np.argsort(neuron_activations)[-print_examples_n:][::-1]
             top_examples = [texts[i] for i in top_indices]
-            print(f"\nNeuron {idx} (from SAE M={neuron_source_sae_info[idx][0]}, K={neuron_source_sae_info[idx][1]}): {interpretations[idx][0]}")
+            print(f"\nNeuron {idx} (from SAE M={neuron_source_sae_info[idx][1]}, K={neuron_source_sae_info[idx][2]}): {interpretations[idx][0]}")
             print(f"\nTop activating examples:")
             for i, example in enumerate(top_examples, 1):
                 print(f"{i}. {get_text_for_printing(example, max_chars=print_examples_max_chars)}")

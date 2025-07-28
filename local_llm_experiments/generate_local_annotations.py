@@ -16,7 +16,7 @@ import pickle
 import numpy as np
 import pandas as pd
 from hypothesaes.annotate import annotate
-from hypothesaes.llm_local import get_vllm_engine
+from hypothesaes.llm_local import get_vllm_engine, is_local_model
 
 from pathlib import Path
 import subprocess
@@ -47,15 +47,15 @@ THINKING_OPTIONS = [True, False]
 # Paths for results
 # ---------------------------------------------------------------------------
 MODELS = [
-    "HuggingFaceTB/SmolLM3-3B",
-    "meta-llama/Llama-3.2-3B-Instruct",
-    "mistralai/Mistral-7B-Instruct-v0.3",
-    "meta-llama/Llama-3.1-8B-Instruct",
-    "Qwen/Qwen3-0.6B",
-    "Qwen/Qwen3-4B",
-    "Qwen/Qwen3-8B",
-    "Qwen/Qwen3-14B",
-    "Qwen/Qwen3-32B-AWQ",
+    # "HuggingFaceTB/SmolLM3-3B",
+    # "meta-llama/Llama-3.2-3B-Instruct",
+    # "mistralai/Mistral-7B-Instruct-v0.3",
+    # "meta-llama/Llama-3.1-8B-Instruct",
+    # "Qwen/Qwen3-0.6B",
+    # "Qwen/Qwen3-4B",
+    # "Qwen/Qwen3-8B",
+    # "Qwen/Qwen3-14B",
+    # "Qwen/Qwen3-32B-AWQ",
     #
     "gpt-4.1",
     "gpt-4.1-mini",
@@ -95,7 +95,8 @@ def run_sweep(model: str, tasks: list[tuple[str, str]]) -> None:
 
     Stores timing information and saves the annotations produced by each model.
     """
-    _ = get_vllm_engine(model)  # Pre-load the model into GPU memory with vLLM
+    if is_local_model(model):
+        _ = get_vllm_engine(model)  # Pre-load the model into GPU memory with vLLM
 
     for thinking in THINKING_OPTIONS:
         # Skip combinations that require special "thinking" tokenizer flag if the model doesn't support it

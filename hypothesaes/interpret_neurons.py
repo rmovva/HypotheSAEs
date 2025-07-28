@@ -17,6 +17,8 @@ DEFAULT_TASK_SPECIFIC_INSTRUCTIONS = """An example feature could be:
 - "describes a patient experiencing seizures or epilepsy"
 - "contains multiple single-digit numbers\""""
 
+DEFAULT_MAX_INTERPRETATION_TOKENS_THINKING = 8192
+
 def sample_top_zero(
     texts: List[str],
     activations: np.ndarray,
@@ -159,7 +161,7 @@ class LLMConfig:
     temperature: Optional[float] = None # Temperature for the interpreter model
     max_interpretation_tokens: int = 100 # Maximum number of tokens for each generated interpretation
     timeout: float = 10.0 # Timeout for the interpreter model (in seconds)
-    tokenizer_kwargs: Dict[str, Any] = field(default_factory=dict) # Extra keyword arguments for the tokenizer, such as "enable_thinking"
+    tokenizer_kwargs: Dict[str, Any] = field(default_factory=lambda: {"enable_thinking": True}) # tokenizer_kwargs are not used for API models
 
 @dataclass
 class InterpretConfig:
@@ -287,6 +289,12 @@ class NeuronInterpreter:
         # For local models (vLLM), use a single call to get_local_completions
         llm_sampling_kwargs = {"temperature": config.llm.temperature} if config.llm.temperature is not None else {}
         if is_local_model(self.interpreter_model):
+            # If enable_thinking is True, set max_interpretation_tokens to DEFAULT_MAX_INTERPRETATION_TOKENS_THINKING if it is lower than that
+            if "enable_thinking" in config.llm.tokenizer_kwargs:
+                if config.llm.tokenizer_kwargs["enable_thinking"]:
+                    if config.llm.max_interpretation_tokens < DEFAULT_MAX_INTERPRETATION_TOKENS_THINKING:
+                        config.llm.max_interpretation_tokens = DEFAULT_MAX_INTERPRETATION_TOKENS_THINKING
+
             raw_responses = get_local_completions(
                 valid_prompts,
                 model=self.interpreter_model,

@@ -82,11 +82,14 @@ def annotate_single_text(
     for attempt in range(max_retries):
         try:
             start_time = time.time()
+            if model.startswith('o'):
+                temperature = 1.0
+                max_tokens = 512
             response_text = get_completion(
                 prompt=prompt,
                 model=model,
                 temperature=temperature,
-                max_tokens=max_tokens,
+                max_completion_tokens=max_tokens,
                 timeout=timeout
             ).strip().lower()
             total_api_time += time.time() - start_time

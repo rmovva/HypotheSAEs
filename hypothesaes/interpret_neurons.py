@@ -8,6 +8,7 @@ import os
 from dataclasses import dataclass, field
 
 from .llm_api import get_completion
+from .llm_local import is_local_model, get_local_completions
 from .utils import load_prompt, truncate_text
 from .annotate import annotate, CACHE_DIR
 
@@ -15,6 +16,8 @@ DEFAULT_TASK_SPECIFIC_INSTRUCTIONS = """An example feature could be:
 - "uses multiple adjectives to describe colors"
 - "describes a patient experiencing seizures or epilepsy"
 - "contains multiple single-digit numbers\""""
+
+DEFAULT_MAX_INTERPRETATION_TOKENS_THINKING = 8192
 
 def sample_top_zero(
     texts: List[str],
@@ -34,7 +37,7 @@ def sample_top_zero(
     # Get indices of positive activations and take top n_per_class (or fewer if not enough positive)
     count_positive_activating = np.sum(neuron_acts > 0)
     if count_positive_activating < n_per_class:
-        print(f"Warning: Only found {count_positive_activating} examples with positive activation, using all available")
+        print(f"[WARNING] Only found {count_positive_activating} examples with positive activation, using all available")
         top_indices = np.argsort(neuron_acts)[-count_positive_activating:]
     else:
         top_indices = np.argsort(neuron_acts)[-n_per_class:]
@@ -44,7 +47,7 @@ def sample_top_zero(
     if len(zero_indices) >= n_per_class:
         random_indices = np.random.choice(zero_indices, size=n_per_class, replace=False)
     else:
-        print(f"Warning: Only found {len(zero_indices)} examples with zero activation, using all available")
+        print(f"[WARNING] Only found {len(zero_indices)} examples with zero activation, using all available")
         random_indices = zero_indices
     
     pos_texts = [texts[i] for i in top_indices]
@@ -88,7 +91,7 @@ def sample_percentile_bins(
     if len(high_indices) >= n_per_class:
         high_sample_indices = np.random.choice(high_indices, size=n_per_class, replace=False)
     else:
-        print(f"Warning: There are less than {n_per_class} examples in bin {high_percentile} for neuron {neuron_idx}; using {len(high_indices)} instead")
+        print(f"[WARNING] There are less than {n_per_class} examples in bin {high_percentile} for neuron {neuron_idx}; using {len(high_indices)} instead")
         high_sample_indices = high_indices
     
     if low_percentile is not None:
@@ -101,7 +104,7 @@ def sample_percentile_bins(
     if len(low_indices) >= n_per_class:
         low_sample_indices = np.random.choice(low_indices, size=n_per_class, replace=False)
     else:
-        print(f"Warning: There are less than {n_per_class} examples in bin {low_percentile} for neuron {neuron_idx}; using {len(low_indices)} instead")
+        print(f"[WARNING] There are less than {n_per_class} examples in bin {low_percentile} for neuron {neuron_idx}; using {len(low_indices)} instead")
         low_sample_indices = low_indices
     
     pos_texts = [texts[i] for i in high_sample_indices]
@@ -149,22 +152,23 @@ def sample_custom(
 class SamplingConfig:
     function: Callable = sample_top_zero
     n_examples: int = 20 # Number of examples to sample to prompt the interpreter
-    random_seed: Optional[int] = None # Random seed for example sampling
+    random_seed: Optional[int] = 0 # Base random seed for example sampling; each interp candidate increments this seed by 1
     max_words_per_example: Optional[int] = 256 # Maximum number of words per text example, truncated if necessary
     sampling_kwargs: Dict[str, Any] = field(default_factory=dict) # Extra keyword arguments for the sampling function
 
 @dataclass
 class LLMConfig:
-    temperature: float = 0.7 # Temperature for the interpreter model
+    temperature: Optional[float] = None # Temperature for the interpreter model
     max_interpretation_tokens: int = 100 # Maximum number of tokens for each generated interpretation
     timeout: float = 10.0 # Timeout for the interpreter model (in seconds)
+    tokenizer_kwargs: Dict[str, Any] = field(default_factory=lambda: {"enable_thinking": True}) # tokenizer_kwargs are not used for API models
 
 @dataclass
 class InterpretConfig:
     sampling: SamplingConfig = field(default_factory=SamplingConfig)
     llm: LLMConfig = field(default_factory=LLMConfig)
     n_candidates: int = 1 # Number of candidate interpretations per neuron
-    prompt_name: str = "interpret-neuron-binary" # Name of the prompt template file to use
+    interpretation_prompt_name: str = "interpret-neuron-binary" # Name of the prompt template file to use
     task_specific_instructions: str = DEFAULT_TASK_SPECIFIC_INSTRUCTIONS # Task-specific instructions for the interpreter model
 
 @dataclass
@@ -177,8 +181,8 @@ class ScoringConfig:
 class NeuronInterpreter:
     def __init__(
         self,
-        interpreter_model: str = "gpt-4o",
-        annotator_model: str = "gpt-4o-mini",
+        interpreter_model: str = "gpt-4.1",
+        annotator_model: str = "gpt-4.1-mini",
         n_workers_interpretation: int = 10,
         n_workers_annotation: int = 30,
         cache_name: Optional[str] = None,
@@ -189,61 +193,18 @@ class NeuronInterpreter:
         self.n_workers_interpretation = n_workers_interpretation
         self.n_workers_annotation = n_workers_annotation
         self.cache_name = cache_name
-        
-    def _get_interpretation_completion(
-        self,
-        prompt_template: str,
-        formatted_examples: dict,
-        config: InterpretConfig,
-    ) -> str:
-        """Get and parse interpretation completion from LLM."""
-        try:
-            prompt = prompt_template.format(
-                task_specific_instructions=config.task_specific_instructions,
-                **formatted_examples
-            )
-        except KeyError as e:
-            raise KeyError(f"Missing required key {e} in the interpretation prompt template. Please ensure all required keys are provided in formatted_examples.")
-        
-        if self.interpreter_model.startswith('o'):
-            response = get_completion(
-                prompt=prompt,
-                model=self.interpreter_model,
-                max_completion_tokens=config.llm.max_interpretation_tokens,
-                reasoning_effort='low'
-            )
-        else:
-            response = get_completion(
-                prompt=prompt,
-                model=self.interpreter_model,
-                temperature=config.llm.temperature,
-                max_tokens=config.llm.max_interpretation_tokens,
-                timeout=config.llm.timeout
-            )
-        
-        return self._parse_interpretation(response)
-    
-    def _parse_interpretation(self, response: str) -> str:
-        """Parse raw LLM response into clean interpretation string."""
-        response = response.strip()
-        if response.startswith('- '):
-            response = response[2:]
-        if response.startswith('"-'):
-            response = response[2:]
-        if response.startswith('" -'):
-            response = response[3:]
-        return response.strip('"')
 
-    def interpret_neuron(
+    def _build_interpretation_prompt(
         self,
         texts: List[str],
         activations: np.ndarray,
         neuron_idx: int,
-        config: InterpretConfig
-    ) -> str:
-        """Generate interpretation for a single neuron."""
+        candidate_idx: int, # This is just used to ensure different sampling seeds for each candidate
+        config: InterpretConfig,
+    ) -> Optional[str]:
+        """Return a fully-formatted prompt for a given neuron or ``None`` if the neuron is dead."""
         if np.all(activations[:, neuron_idx] <= 0):
-            print(f"Warning: All activations for neuron {neuron_idx} are <= 0. This neuron may be dead. Skipping interpretation.")
+            print(f"[WARNING] All activations for neuron {neuron_idx} are <= 0. This neuron may be dead. Skipping interpretation.")
             return None
 
         formatted_examples = config.sampling.function(
@@ -252,16 +213,115 @@ class NeuronInterpreter:
             neuron_idx=neuron_idx,
             n_examples=config.sampling.n_examples,
             max_words_per_example=config.sampling.max_words_per_example,
-            random_seed=config.sampling.random_seed,
-            **config.sampling.sampling_kwargs
+            random_seed=config.sampling.random_seed + candidate_idx,
+            **config.sampling.sampling_kwargs,
         )
+
+        try:
+            interpretation_prompt_template = load_prompt(config.interpretation_prompt_name)
+            prompt = interpretation_prompt_template.format(
+                task_specific_instructions=config.task_specific_instructions,
+                **formatted_examples
+            )
+        except KeyError as e:
+            raise KeyError(f"Missing required key {e} in the interpretation prompt template. Please ensure all required keys are provided in formatted_examples.")
+
+        return prompt
+    
+    def _parse_interpretation(self, response: str) -> str:
+        """Parse raw LLM response into clean interpretation string."""
+        response = response.strip()
         
-        prompt_template = load_prompt(config.prompt_name)
-        return self._get_interpretation_completion(
-            prompt_template=prompt_template,
-            formatted_examples=formatted_examples,
-            config=config
-        )
+        # Handle incomplete response (i.e. if the model started thinking but didn't finish)
+        if '<think>' in response and '</think>' not in response:
+            return None
+        # Thinking completed
+        if '</think>' in response:
+            response = response.split('</think>')[1].strip()
+        
+        # Remove any prefixes
+        response = response.split('\n', 1)[0]
+        prefixes = ['- ', '"-', '" -']
+        for prefix in prefixes:
+            if response.startswith(prefix):
+                response = response[len(prefix):]
+        
+        return response.strip('"').strip()
+ 
+    def _get_interpretation_openai(
+        self,
+        prompt: str,
+        config: InterpretConfig,
+    ) -> Optional[str]:
+        """Send a single prompt to the interpreter model and return the parsed interpretation."""
+        try:
+            if self.interpreter_model.startswith("o"):
+                response = get_completion(
+                    prompt=prompt,
+                    model=self.interpreter_model,
+                    max_completion_tokens=config.llm.max_interpretation_tokens,
+                    reasoning_effort="low",
+                )
+            else:
+                response = get_completion(
+                    prompt=prompt,
+                    model=self.interpreter_model,
+                    temperature=config.llm.temperature,
+                    max_tokens=config.llm.max_interpretation_tokens,
+                    timeout=config.llm.timeout,
+                )
+            return self._parse_interpretation(response)
+        except Exception as e:
+            print(f"Failed to get interpretation: {e}")
+            return None
+
+    def _execute_prompts(
+        self,
+        prompts: List[str],
+        config: InterpretConfig,
+    ) -> List[str]:
+        """Execute a batch of prompts and return parsed interpretations (one per prompt)."""
+        # Remove ``None`` before sending for completion
+        valid_prompts = [p for p in prompts if p is not None]
+        if not valid_prompts:
+            return []
+
+        # For local models (vLLM), use a single call to get_local_completions
+        llm_sampling_kwargs = {"temperature": config.llm.temperature} if config.llm.temperature is not None else {}
+        if is_local_model(self.interpreter_model):
+            # If enable_thinking is True, set max_interpretation_tokens to DEFAULT_MAX_INTERPRETATION_TOKENS_THINKING if it is lower than that
+            if "enable_thinking" in config.llm.tokenizer_kwargs:
+                if config.llm.tokenizer_kwargs["enable_thinking"]:
+                    if config.llm.max_interpretation_tokens < DEFAULT_MAX_INTERPRETATION_TOKENS_THINKING:
+                        config.llm.max_interpretation_tokens = DEFAULT_MAX_INTERPRETATION_TOKENS_THINKING
+
+            raw_responses = get_local_completions(
+                valid_prompts,
+                model=self.interpreter_model,
+                tokenizer_kwargs=config.llm.tokenizer_kwargs,
+                max_tokens=config.llm.max_interpretation_tokens,
+                llm_sampling_kwargs=llm_sampling_kwargs,
+            )
+            return [self._parse_interpretation(r) for r in raw_responses]
+
+        # Use parallel threads to generate interpretations for API models
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.n_workers_interpretation) as executor:
+            future_to_idx = {
+                executor.submit(self._get_interpretation_openai, p, config): i
+                for i, p in enumerate(valid_prompts)
+            }
+
+            iterator = tqdm(
+                concurrent.futures.as_completed(future_to_idx),
+                total=len(valid_prompts),
+                desc="Generating interpretations",
+            )
+
+            ordered_interpretations = [None] * len(valid_prompts)
+            for fut in iterator:
+                idx = future_to_idx[fut]
+                ordered_interpretations[idx] = fut.result()
+            return ordered_interpretations
 
     def interpret_neurons(
         self,
@@ -272,38 +332,37 @@ class NeuronInterpreter:
     ) -> Dict[int, List[str]]:
         """Generate interpretations for multiple neurons with multiple candidates each."""
         config = config or InterpretConfig()
-        
         interpretation_tasks = [
             (neuron_idx, candidate_idx)
             for neuron_idx in neuron_indices
             for candidate_idx in range(config.n_candidates)
         ]
-        
+
         interpretations = {idx: [] for idx in neuron_indices}
-        with concurrent.futures.ThreadPoolExecutor(max_workers=self.n_workers_interpretation) as executor:
-            future_to_task = {
-                executor.submit(
-                    self.interpret_neuron,
-                    texts=texts,
-                    activations=activations,
-                    neuron_idx=neuron_idx,
-                    config=config
-                ): (neuron_idx, candidate_idx)
-                for neuron_idx, candidate_idx in interpretation_tasks
-            }
-            
-            iterator = concurrent.futures.as_completed(future_to_task)
-            iterator = tqdm(iterator, total=len(interpretation_tasks), 
-                           desc=f"Generating {config.n_candidates} interpretation(s) per neuron")
-            
-            for future in iterator:
-                neuron_idx, candidate_idx = future_to_task[future]
-                try:
-                    interpretation = future.result()
-                    interpretations[neuron_idx].append(interpretation)
-                except Exception as e:
-                    print(f"Failed to generate interpretation {candidate_idx} for neuron {neuron_idx}: {e}")
-        
+
+        # Build prompts for every (neuron, candidate) pair
+        prompts = []
+        for neuron_idx, candidate_idx in interpretation_tasks:
+            prompt = self._build_interpretation_prompt(
+                texts=texts,
+                activations=activations,
+                neuron_idx=neuron_idx,
+                candidate_idx=candidate_idx,
+                config=config,
+            )
+            prompts.append(prompt)
+
+        # Execute all valid prompts in a single batch (implementation-aware)
+        generated_interpretations = self._execute_prompts(prompts, config)
+
+        # Stitch responses back to their respective tasks / neurons
+        interpretations_iterator = iter(generated_interpretations)
+        for idx, (neuron_idx, _) in enumerate(interpretation_tasks):
+            if prompts[idx] is None:
+                interpretations[neuron_idx].append(None)
+            else:
+                interpretations[neuron_idx].append(next(interpretations_iterator))
+
         return interpretations
 
     def _compute_metrics(
@@ -344,7 +403,9 @@ class NeuronInterpreter:
         texts: List[str],
         activations: np.ndarray,
         interpretations: Dict[int, List[str]],
-        config: Optional[ScoringConfig] = None
+        config: Optional[ScoringConfig] = None,
+        show_progress: bool = True,
+        **annotation_kwargs
     ) -> Dict[int, Dict[str, Dict[str, float]]]:
         """Score all interpretations for all neurons."""
         config = config or ScoringConfig()
@@ -373,20 +434,22 @@ class NeuronInterpreter:
             }
 
             for interp in neuron_interps:
+                if interp is None:
+                    continue
                 for text in eval_texts:
                     tasks.append((text, interp))
 
         # Annotate all tasks
-        progress_desc = f"Scoring neuron interpretation fidelity ({len(interpretations)} neurons; {len(next(iter(interpretations.values())))} candidate interps per neuron; {config.n_examples} examples to score each interp)"
-        
         cache_path = None if self.cache_name is None else os.path.join(CACHE_DIR, f"{self.cache_name}_interp-scoring.json")
+        progress_desc = f"Scoring neuron interpretation fidelity ({len(interpretations)} neurons; {len(next(iter(interpretations.values())))} candidate interps per neuron; {config.n_examples} examples to score each interp)"
         annotations = annotate(
             tasks=tasks,
             cache_path=cache_path,
             n_workers=self.n_workers_annotation,
-            show_progress=True,
+            show_progress=show_progress,
             model=self.annotator_model,
-            progress_desc=progress_desc
+            progress_desc=progress_desc,
+            **annotation_kwargs
         )
 
         # Compute metrics for all interpretations
@@ -396,6 +459,9 @@ class NeuronInterpreter:
             neuron_scoring_info = scoring_info[neuron_idx]
 
             for interp in neuron_interps:
+                if interp is None:
+                    all_metrics[neuron_idx][interp] = {"recall": 0.0, "precision": 0.0, "f1": 0.0, "correlation": 0.0}
+                    continue
                 annot = [annotations[interp][text] for text in neuron_scoring_info['texts']]
                 all_metrics[neuron_idx][interp] = self._compute_metrics(
                     annotations=np.array(annot),

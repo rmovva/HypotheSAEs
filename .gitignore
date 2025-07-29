@@ -9,6 +9,7 @@ data/*
 *checkpoints*
 *cache*
 notebooks/testing_notebook.ipynb
+local_llm_experiments/results/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

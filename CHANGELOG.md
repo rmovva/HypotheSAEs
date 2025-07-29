@@ -2,6 +2,20 @@
 
 New version releases for HypotheSAEs will be documented here.
 
+## [0.3.0] - 2025-07-28
+
+### Added
+- `llm_local.py` module for local LLM inference with vLLM, `tests/test_local_llm.py` for unit tests
+- `quickstart_local.ipynb` notebook to get started with local LLMs
+- `local_llm_experiments` contains experiments benchmarking local LLMs for autointerp and concept annotation
+
+### Changed
+- `interpret_neurons.py`, `annotate.py`, `requirements.txt` modified to support local LLM inference
+- `quickstart.ipynb` notebook now uses matryoshka SAE by default
+
+### Fixed
+- `requirements.txt` forces scipy==1.15.3 to avoid bug with Python 3.13
+
 ## [0.2.0] - 2025-05-03
 
 ### Added

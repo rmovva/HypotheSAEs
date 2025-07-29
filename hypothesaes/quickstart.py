@@ -107,8 +107,7 @@ def interpret_sae(
     *,
     neuron_indices: Optional[List[int]] = None,
     n_random_neurons: Optional[int] = None,
-    interpreter_model: str = "gpt-4o",
-    annotator_model: str = "gpt-4o-mini",
+    interpreter_model: str = "gpt-4.1",
     n_examples_for_interpretation: int = 20,
     max_words_per_example: int = 256,
     interpret_temperature: float = 0.7,
@@ -127,7 +126,6 @@ def interpret_sae(
         neuron_indices: Specific neuron indices to interpret (mutually exclusive with n_random_neurons)
         n_random_neurons: Number of random neurons to interpret (mutually exclusive with neuron_indices)
         interpreter_model: LLM to use for generating interpretations
-        annotator_model: LLM to use for scoring interpretations
         n_examples: Number of examples to use for interpretation
         max_words_per_example: Maximum words per text to prompt the interpreter LLM with
         temperature: Temperature for LLM generation
@@ -163,7 +161,6 @@ def interpret_sae(
     # Set up interpreter
     interpreter = NeuronInterpreter(
         interpreter_model=interpreter_model,
-        annotator_model=annotator_model,
     )
 
     interpret_config = InterpretConfig(
@@ -200,7 +197,7 @@ def interpret_sae(
         if print_examples_n > 0:
             top_indices = np.argsort(neuron_activations)[-print_examples_n:][::-1]
             top_examples = [texts[i] for i in top_indices]
-            print(f"\nNeuron {idx} (from SAE M={neuron_source_sae_info[idx][0]}, K={neuron_source_sae_info[idx][1]}): {interpretations[idx][0]}")
+            print(f"\nNeuron {idx} (from SAE M={neuron_source_sae_info[idx][1]}, K={neuron_source_sae_info[idx][2]}): {interpretations[idx][0]}")
             print(f"\nTop activating examples:")
             for i, example in enumerate(top_examples, 1):
                 print(f"{i}. {get_text_for_printing(example, max_chars=print_examples_max_chars)}")
@@ -221,8 +218,8 @@ def generate_hypotheses(
     classification: Optional[bool] = None,
     selection_method: str = "separation_score",
     n_selected_neurons: int = 20,
-    interpreter_model: str = "gpt-4o",
-    annotator_model: str = "gpt-4o-mini",
+    interpreter_model: str = "gpt-4.1",
+    annotator_model: str = "gpt-4.1-mini",
     n_examples_for_interpretation: int = 20,
     max_words_per_example: int = 256,
     interpret_temperature: float = 0.7,
@@ -359,7 +356,7 @@ def evaluate_hypotheses(
     labels: Union[List[int], List[float], np.ndarray],
     *,
     cache_name: Optional[str] = None,
-    annotator_model: str = "gpt-4o-mini",
+    annotator_model: str = "gpt-4.1-mini",
     max_words_per_example: int = 256,
     classification: Optional[bool] = None,
     n_workers_annotation: int = 30,

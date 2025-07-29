@@ -208,6 +208,8 @@ def get_local_embeddings(
 ) -> Dict[str, np.ndarray]:
     """Get embeddings using local SentenceTransformer model with chunked caching."""
     from sentence_transformers import SentenceTransformer
+    import torch
+    import gc
 
     # Filter out None values and empty strings
     texts = filter_invalid_texts(texts)
@@ -247,12 +249,12 @@ def get_local_embeddings(
         for i in batch_iterator:
             batch = chunk_texts[i:i+batch_size]
             if "nomic-ai" in model:
-                batch = ["search_document: " + text for text in batch]
+                prefixed_batch = ["clustering: " + text for text in batch]
             elif "instructor" in model:
-                batch = [["Represent the text for classification: ", text] for text in batch]
+                prefixed_batch = [["Represent the text for classification: ", text] for text in batch]
             else:
-                batch = batch
-            batch_embs = transformer_model.encode(batch, batch_size=batch_size)
+                prefixed_batch = batch
+            batch_embs = transformer_model.encode(prefixed_batch, batch_size=batch_size)
             
             for text, embedding in zip(batch, batch_embs):
                 chunk_embeddings[text] = embedding
@@ -260,5 +262,10 @@ def get_local_embeddings(
         
         # Save completed chunk
         next_chunk_idx = _save_embedding_chunk(cache_name, chunk_embeddings, next_chunk_idx)
+
+    del transformer_model
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
     
     return text2embedding

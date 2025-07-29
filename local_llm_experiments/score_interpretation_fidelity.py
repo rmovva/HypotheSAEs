@@ -1,15 +1,13 @@
 import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "4"
 
-from time import time
 import pandas as pd
 import numpy as np
 
-os.environ['OPENAI_KEY_SAE'] = os.environ['OAI_GENERAL']
-
 import json
 import pickle
-from hypothesaes.interpret_neurons import NeuronInterpreter, InterpretConfig, LLMConfig, SamplingConfig, ScoringConfig, sample_percentile_bins
+
+from hypothesaes.interpret_neurons import NeuronInterpreter, ScoringConfig, sample_percentile_bins
 
 base_dir = os.path.join('/nas/ucb/rmovva/data/hypothesaes')
 train_df = pd.read_json(os.path.join(base_dir, 'hypothesis-generation-data', 'yelp', "train-200K.json"), lines=True)

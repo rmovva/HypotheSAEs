@@ -62,7 +62,7 @@ def run_sweep(model: str, texts: list[str], activations: np.ndarray, neurons_to_
 
     interpreter = NeuronInterpreter(interpreter_model=model)
     for thinking in THINKING_OPTIONS:
-        # Skip combinations that require the special "thinking" tokenizer flag if the model doesn't support it
+        # Skip thinking=True for models without thinking support
         if thinking and not any(x in model for x in ("Qwen", "SmolLM3")):
             continue
 
@@ -86,7 +86,6 @@ def run_sweep(model: str, texts: list[str], activations: np.ndarray, neurons_to_
         )
 
         start_time = time.time()
-        # Interpret every neuron in the SAE
         interpretations = interpreter.interpret_neurons(
             texts=texts,
             activations=activations,
@@ -108,7 +107,7 @@ def run_sweep(model: str, texts: list[str], activations: np.ndarray, neurons_to_
         except (FileNotFoundError, json.JSONDecodeError):
             all_interps = {}
 
-        # Convert neuron keys to str for JSON compatibility
+        # JSON requires str keys
         model_dict = {str(n): v for n, v in interpretations.items()}
         all_interps[model_key] = model_dict
 
@@ -137,7 +136,7 @@ def main() -> None:
     args = parser.parse_args()
 
     # -----------------------------------------------------------------------
-    # OUTER LOOP: if no specific model was given, spawn a subprocess per model
+    # OUTER LOOP: loop over models, start a subprocess for each one
     # -----------------------------------------------------------------------
     if args.model is None or args.model.lower() == "all":
         script_path = Path(__file__).resolve()
@@ -149,13 +148,13 @@ def main() -> None:
                     check=True,
                 )
             except subprocess.CalledProcessError as exc:
-                print(f"⚠️  Sweep failed for {model_name}: {exc}")
+                print(f"Sweep failed for {model_name}: {exc}")
         
         print_timing_table()
         return
 
     # -----------------------------------------------------------------------
-    # INNER LOOP: normal behaviour when --model is provided
+    # INNER LOOP: compute results for a single model
     # -----------------------------------------------------------------------
     df = pd.read_json(args.data, lines=True)
     texts = df["text"].tolist()

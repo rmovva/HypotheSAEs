@@ -38,7 +38,7 @@ CONCEPTS = [
     "describes a mixed experience, where the food was good but there were issues with the service or ambiance",
 ]
 
-# Root directory for all experiment outputs (match interpretation script)
+# Root directory for all experiment outputs
 ROOT = Path('/nas/ucb/rmovva/data/hypothesaes')
 
 THINKING_OPTIONS = [True, False]
@@ -99,7 +99,7 @@ def run_sweep(model: str, tasks: list[tuple[str, str]]) -> None:
         _ = get_vllm_engine(model)  # Pre-load the model into GPU memory with vLLM
 
     for thinking in THINKING_OPTIONS:
-        # Skip combinations that require special "thinking" tokenizer flag if the model doesn't support it
+        # Skip thinking=True for models without thinking support
         if thinking and not any(x in model for x in ("Qwen", "SmolLM3")):
             continue
 
@@ -176,7 +176,7 @@ def main() -> None:
     args = parser.parse_args()
 
     # -----------------------------------------------------------------------
-    # OUTER LOOP: if no specific model was given, spawn a subprocess per model
+    # OUTER LOOP: loop over models, start a subprocess for each one
     # -----------------------------------------------------------------------
     if args.model is None or args.model.lower() == "all":
         script_path = Path(__file__).resolve()
@@ -188,13 +188,13 @@ def main() -> None:
                     check=True,
                 )
             except subprocess.CalledProcessError as exc:
-                print(f"⚠️  Sweep failed for {model_name}: {exc}")
+                print(f"Sweep failed for {model_name}: {exc}")
         
         print_timing_table()
         return
 
     # -----------------------------------------------------------------------
-    # INNER LOOP: normal behaviour when --model is provided
+    # INNER LOOP: compute results for a single model
     # -----------------------------------------------------------------------
     df = pd.read_json(args.data, lines=True)
     tasks = build_tasks(df)

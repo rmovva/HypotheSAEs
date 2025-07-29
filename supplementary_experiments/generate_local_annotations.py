@@ -28,7 +28,7 @@ import sys
 
 current_dir = os.getcwd()
 prefix = './' if current_dir.endswith("HypotheSAEs") else '../'
-DATA_PATH = os.path.join(prefix, "demo-data", "yelp-demo-val-2K.json")
+DATA_PATH = os.path.join(prefix, "demo_data", "yelp-demo-val-2K.json")
 
 CONCEPTS = [
     "uses superlative language to describe the restaurant as the best in a specific category (e.g., 'best lobster roll', 'best bakery', 'best cheesesteaks')",

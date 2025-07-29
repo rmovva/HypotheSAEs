@@ -47,15 +47,15 @@ THINKING_OPTIONS = [True, False]
 # Paths for results
 # ---------------------------------------------------------------------------
 MODELS = [
-    # "HuggingFaceTB/SmolLM3-3B",
-    # "meta-llama/Llama-3.2-3B-Instruct",
-    # "mistralai/Mistral-7B-Instruct-v0.3",
-    # "meta-llama/Llama-3.1-8B-Instruct",
-    # "Qwen/Qwen3-0.6B",
-    # "Qwen/Qwen3-4B",
-    # "Qwen/Qwen3-8B",
-    # "Qwen/Qwen3-14B",
-    # "Qwen/Qwen3-32B-AWQ",
+    "HuggingFaceTB/SmolLM3-3B",
+    "meta-llama/Llama-3.2-3B-Instruct",
+    "mistralai/Mistral-7B-Instruct-v0.3",
+    "meta-llama/Llama-3.1-8B-Instruct",
+    "Qwen/Qwen3-0.6B",
+    "Qwen/Qwen3-4B",
+    "Qwen/Qwen3-8B",
+    "Qwen/Qwen3-14B",
+    "Qwen/Qwen3-32B-AWQ",
     #
     "gpt-4.1",
     "gpt-4.1-mini",

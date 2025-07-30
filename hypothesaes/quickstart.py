@@ -107,6 +107,7 @@ def interpret_sae(
     *,
     neuron_indices: Optional[List[int]] = None,
     n_random_neurons: Optional[int] = None,
+    n_top_neurons: Optional[int] = None,
     interpreter_model: str = "gpt-4.1",
     n_examples_for_interpretation: int = 20,
     max_words_per_example: int = 256,
@@ -123,8 +124,9 @@ def interpret_sae(
         texts: Input text examples
         embeddings: Pre-computed embeddings for the input texts
         sae: A single SAE or a list of SAEs
-        neuron_indices: Specific neuron indices to interpret (mutually exclusive with n_random_neurons)
-        n_random_neurons: Number of random neurons to interpret (mutually exclusive with neuron_indices)
+        neuron_indices: Specific neuron indices to interpret (mutually exclusive with n_random_neurons and n_top_neurons)
+        n_random_neurons: Number of random neurons to interpret (mutually exclusive with neuron_indices and n_top_neurons)
+        n_top_neurons: Number of most prevalent neurons to interpret (mutually exclusive with neuron_indices and n_random_neurons)
         interpreter_model: LLM to use for generating interpretations
         n_examples: Number of examples to use for interpretation
         max_words_per_example: Maximum words per text to prompt the interpreter LLM with
@@ -138,11 +140,9 @@ def interpret_sae(
     Returns:
         Dictionary mapping neuron indices to their interpretations and top examples
     """
-    if neuron_indices is None and n_random_neurons is None:
-        raise ValueError("Either neuron_indices or n_random_neurons must be provided")
-    
-    if neuron_indices is not None and n_random_neurons is not None:
-        raise ValueError("Only one of neuron_indices or n_random_neurons should be provided")
+    selection_params = [neuron_indices, n_random_neurons, n_top_neurons]
+    if sum(p is not None for p in selection_params) != 1:
+        raise ValueError("Exactly one of neuron_indices, n_random_neurons, or n_top_neurons must be provided")
     
     if not isinstance(embeddings, torch.Tensor):
         X = torch.tensor(embeddings, dtype=torch.float)
@@ -152,11 +152,19 @@ def interpret_sae(
     # Get activations from SAE(s)
     activations, neuron_source_sae_info = get_multiple_sae_activations(sae, X, return_neuron_source_info=True)
     print(f"Activations shape: {activations.shape}")
+    # Compute prevalence for each neuron (percentage of examples where activation > 1)
+    activation_counts = (activations > 1).sum(axis=0)
+    activation_percent = activation_counts / activations.shape[0] * 100
     
     # Select neurons to interpret
+    total_neurons = activations.shape[1]
     if neuron_indices is None:
-        total_neurons = activations.shape[1]
-        neuron_indices = np.random.choice(total_neurons, size=n_random_neurons, replace=False)
+        if n_random_neurons is not None:
+            neuron_indices = np.random.choice(total_neurons, size=n_random_neurons, replace=False)
+        else:  # n_top_neurons is not None
+            if n_top_neurons > total_neurons:
+                raise ValueError(f"n_top_neurons ({n_top_neurons}) cannot exceed total neurons ({total_neurons})")
+            neuron_indices = np.argsort(activation_counts)[-n_top_neurons:][::-1]
     
     # Set up interpreter
     interpreter = NeuronInterpreter(
@@ -197,7 +205,7 @@ def interpret_sae(
         if print_examples_n > 0:
             top_indices = np.argsort(neuron_activations)[-print_examples_n:][::-1]
             top_examples = [texts[i] for i in top_indices]
-            print(f"\nNeuron {idx} (from SAE M={neuron_source_sae_info[idx][1]}, K={neuron_source_sae_info[idx][2]}): {interpretations[idx][0]}")
+            print(f"\nNeuron {idx} ({activation_percent[idx]:.1f}% active, from SAE M={neuron_source_sae_info[idx][1]}, K={neuron_source_sae_info[idx][2]}): {interpretations[idx][0]}")
             print(f"\nTop activating examples:")
             for i, example in enumerate(top_examples, 1):
                 print(f"{i}. {get_text_for_printing(example, max_chars=print_examples_max_chars)}")
@@ -259,7 +267,7 @@ def generate_hypotheses(
     else:
         X = embeddings
     
-    if classification is None:
+    if classification is None: # Heuristic check for whether this is a classification task
         classification = np.all(np.isin(np.random.choice(labels, size=1000, replace=True), [0, 1]))
     
     print(f"Embeddings shape: {embeddings.shape}")

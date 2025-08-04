@@ -256,14 +256,15 @@ class SparseAutoencoder(nn.Module):
         multi_coef: float = 0.0,
         patience: int = 5,
         show_progress: bool = True,
-        clip_grad: float = 1.0
+        clip_grad: float = 1.0,
+        device: Optional[torch.device] = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     ) -> Dict:
         """Train the sparse autoencoder on input data."""
         train_loader = DataLoader(TensorDataset(X_train), batch_size=batch_size, shuffle=True)
         val_loader = DataLoader(TensorDataset(X_val), batch_size=batch_size) if X_val is not None else None
         
         # Initialize from batch of data
-        self.initialize_weights_(X_train.to(self.device))
+        self.initialize_weights_(X_train.to(device))
         
         optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
         
@@ -279,7 +280,7 @@ class SparseAutoencoder(nn.Module):
             train_losses = []
             
             for batch_x, in train_loader:
-                batch_x = batch_x.to(self.device)
+                batch_x = batch_x.to(device)
                 recon, info = self(batch_x)
                 loss = self.compute_loss(batch_x, recon, info, aux_coef, multi_coef)
                 
@@ -309,7 +310,7 @@ class SparseAutoencoder(nn.Module):
                 val_losses = []
                 with torch.no_grad():
                     for batch_x, in val_loader:
-                        batch_x = batch_x.to(self.device)
+                        batch_x = batch_x.to(device)
                         recon, info = self(batch_x)
                         val_loss = self.compute_loss(batch_x, recon, info, aux_coef, multi_coef)
                         val_losses.append(val_loss.item())
@@ -346,7 +347,7 @@ class SparseAutoencoder(nn.Module):
     # ------------------------------------------------------------------
     # Compute activations with batched SAE inference
     # ------------------------------------------------------------------
-    def get_activations(self, inputs, batch_size=16384, show_progress=True):
+    def get_activations(self, inputs, batch_size=16384, show_progress=True) -> np.ndarray:
         """Get sparse activations for input data with batching to prevent CUDA OOM.
         
         Args:

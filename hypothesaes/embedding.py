@@ -12,11 +12,13 @@ import glob
 import torch
 import openai
 from .utils import filter_invalid_texts
+from sentence_transformers import SentenceTransformer
+import torch
+import gc
+
 
 # Use environment variable for cache dir if set, otherwise use default
 CACHE_DIR = os.getenv('EMB_CACHE_DIR') or os.path.join(Path(__file__).parent.parent, 'emb_cache')
-
-device = "cuda" if torch.cuda.is_available() else "cpu"
 
 def _embed_batch_openai(
         batch: List[str], 
@@ -25,7 +27,7 @@ def _embed_batch_openai(
         max_tokens: int = 8192, 
         max_retries: int = 3, 
         backoff_factor: float = 3.0,
-        timeout: float = 10.0,
+        timeout: float = 10.0
 ) -> List[List[float]]:
     """Helper function for batch embedding using OpenAI API."""
     # Truncate texts to max tokens
@@ -205,12 +207,9 @@ def get_local_embeddings(
     show_progress: bool = True,
     cache_name: Optional[str] = None,
     chunk_size: int = 50000,
+    device: Optional[torch.device] = "cuda" if torch.cuda.is_available() else "cpu"
 ) -> Dict[str, np.ndarray]:
     """Get embeddings using local SentenceTransformer model with chunked caching."""
-    from sentence_transformers import SentenceTransformer
-    import torch
-    import gc
-
     # Filter out None values and empty strings
     texts = filter_invalid_texts(texts)
     

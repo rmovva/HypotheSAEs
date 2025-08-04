@@ -21,9 +21,6 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm.auto import tqdm
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-
 # ----------------------------------------------------------------------------
 # Sparse Autoencoder with optional Matryoshka loss
 # ----------------------------------------------------------------------------
@@ -39,6 +36,7 @@ class SparseAutoencoder(nn.Module):
         multi_k: Optional[int] = None,
         dead_neuron_threshold_steps: int = 256,
         prefix_lengths: Optional[List[int]] = None,
+        device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     ) -> None:
         """Create a top-K sparse autoencoder.
 
@@ -265,7 +263,7 @@ class SparseAutoencoder(nn.Module):
         val_loader = DataLoader(TensorDataset(X_val), batch_size=batch_size) if X_val is not None else None
         
         # Initialize from batch of data
-        self.initialize_weights_(X_train.to(device))
+        self.initialize_weights_(X_train.to(self.device))
         
         optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
         
@@ -281,7 +279,7 @@ class SparseAutoencoder(nn.Module):
             train_losses = []
             
             for batch_x, in train_loader:
-                batch_x = batch_x.to(device)
+                batch_x = batch_x.to(self.device)
                 recon, info = self(batch_x)
                 loss = self.compute_loss(batch_x, recon, info, aux_coef, multi_coef)
                 
@@ -311,7 +309,7 @@ class SparseAutoencoder(nn.Module):
                 val_losses = []
                 with torch.no_grad():
                     for batch_x, in val_loader:
-                        batch_x = batch_x.to(device)
+                        batch_x = batch_x.to(self.device)
                         recon, info = self(batch_x)
                         val_loss = self.compute_loss(batch_x, recon, info, aux_coef, multi_coef)
                         val_losses.append(val_loss.item())
@@ -379,7 +377,7 @@ class SparseAutoencoder(nn.Module):
                 
             for i in iterator:
                 batch = inputs[i:i+batch_size]
-                batch = batch.to(device)
+                batch = batch.to(self.device)
                 _, info = self(batch)
                 batch_activations = info['activations']
                 all_activations.append(batch_activations.cpu())
@@ -396,7 +394,7 @@ def get_sae_checkpoint_name(m_total_neurons, k_active_neurons, prefix_lengths=No
         prefix_str = "-".join(str(g) for g in prefix_lengths)
         return f'SAE_matryoshka_M={m_total_neurons}_K={k_active_neurons}_prefixes={prefix_str}.pt'
 
-def load_model(path: str) -> SparseAutoencoder:
+def load_model(path: str, device: Optional[torch.device] = torch.device("cuda" if torch.cuda.is_available() else "cpu")) -> SparseAutoencoder:
     ckpt = torch.load(path, pickle_module=pickle)
     model = SparseAutoencoder(**ckpt["config"]).to(device)
     model.load_state_dict(ckpt["state_dict"])

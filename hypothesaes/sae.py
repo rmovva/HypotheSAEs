@@ -264,7 +264,7 @@ class SparseAutoencoder(nn.Module):
         val_loader = DataLoader(TensorDataset(X_val), batch_size=batch_size) if X_val is not None else None
         
         # Initialize from batch of data
-        self.initialize_weights_(X_train.to(device))
+        self.initialize_weights_(X_train.to(device)) 
         
         optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
         
@@ -347,7 +347,7 @@ class SparseAutoencoder(nn.Module):
     # ------------------------------------------------------------------
     # Compute activations with batched SAE inference
     # ------------------------------------------------------------------
-    def get_activations(self, inputs, batch_size=16384, show_progress=True) -> np.ndarray:
+    def get_activations(self, inputs, batch_size=16384, show_progress=True, device: Optional[torch.device] = torch.device("cuda" if torch.cuda.is_available() else "cpu")) -> np.ndarray:
         """Get sparse activations for input data with batching to prevent CUDA OOM.
         
         Args:
@@ -378,7 +378,7 @@ class SparseAutoencoder(nn.Module):
                 
             for i in iterator:
                 batch = inputs[i:i+batch_size]
-                batch = batch.to(self.device)
+                batch = batch.to(device)
                 _, info = self(batch)
                 batch_activations = info['activations']
                 all_activations.append(batch_activations.cpu())

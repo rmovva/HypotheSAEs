@@ -207,7 +207,7 @@ def get_local_embeddings(
     show_progress: bool = True,
     cache_name: Optional[str] = None,
     chunk_size: int = 50000,
-    device: Optional[torch.device] = "cuda" if torch.cuda.is_available() else "cpu"
+    device: Optional[torch.device] = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 ) -> Dict[str, np.ndarray]:
     """Get embeddings using local SentenceTransformer model with chunked caching."""
     # Filter out None values and empty strings

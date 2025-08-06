@@ -1,4 +1,4 @@
-Is text_a and text_b similar in meaning? respond with yes, related, or no.
+Are text_a and text_b similar in meaning? Respond with yes, related, or no.
 
 Here are a few examples.
 Example 1:

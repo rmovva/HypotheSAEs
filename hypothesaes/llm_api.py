@@ -31,6 +31,8 @@ model_abbrev_to_id = {
     "gpt-4.1-nano": "gpt-4.1-nano-2025-04-14",
 }
 
+DEFAULT_MODEL = "gpt-4.1-mini"
+
 def get_client():
     """Get the OpenAI client, initializing it if necessary."""
     api_key = os.environ.get('OPENAI_KEY_SAE')
@@ -41,7 +43,7 @@ def get_client():
 
 def get_completion(
     prompt: str,
-    model: str = "gpt-4o",
+    model: str = DEFAULT_MODEL,
     timeout: float = 15.0,
     max_retries: int = 3,
     backoff_factor: float = 2.0,

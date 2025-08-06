@@ -68,9 +68,8 @@ def hungarian_matching_algorithm(
 def evaluate_predicate_surface_similarity(
     predicate1: str,
     predicate2: str,
-    model: str = "gpt-4-turbo-preview",
-    temperature: float = 0.7,
-    n_samples: int = 5
+    n_samples: int = 5,
+    **kwargs # 'model', 'temperature', 'max_tokens', etc.
 ) -> float:
     """Evaluate surface similarity between two predicates using LLM."""
     prompt = load_prompt("surface-similarity")
@@ -79,9 +78,7 @@ def evaluate_predicate_surface_similarity(
     for _ in range(n_samples):
         response = get_completion(
             prompt=prompt.format(text_a=predicate1, text_b=predicate2),
-            model=model,
-            temperature=temperature,
-            max_tokens=2
+            **kwargs
         )
         
         response = response.strip().lower()

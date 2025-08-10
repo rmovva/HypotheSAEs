@@ -82,7 +82,7 @@ def annotate_single_text(
     for attempt in range(max_retries):
         try:
             start_time = time.time()
-            if model.startswith('o'):
+            if model.startswith('o') or 'gpt-5' in model:
                 temperature = 1.0
                 max_tokens = 512
             response_text = get_completion(

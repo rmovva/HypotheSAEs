@@ -255,7 +255,14 @@ class NeuronInterpreter:
     ) -> Optional[str]:
         """Send a single prompt to the interpreter model and return the parsed interpretation."""
         try:
-            if self.interpreter_model.startswith("o"):
+            if "gpt-5" in self.interpreter_model:
+                response = get_completion(
+                    prompt=prompt,
+                    model=self.interpreter_model,
+                    max_completion_tokens=config.llm.max_interpretation_tokens,
+                    reasoning_effort="minimal",
+                )
+            elif self.interpreter_model.startswith("o"):
                 response = get_completion(
                     prompt=prompt,
                     model=self.interpreter_model,

@@ -29,6 +29,8 @@ model_abbrev_to_id = {
     "gpt-4.1-mini": "gpt-4.1-mini-2025-04-14",
     "gpt4.1-nano": "gpt-4.1-nano-2025-04-14",
     "gpt-4.1-nano": "gpt-4.1-nano-2025-04-14",
+    "gpt5": "gpt-5",
+    "gpt-5": "gpt-5",
 }
 
 DEFAULT_MODEL = "gpt-4.1-mini"

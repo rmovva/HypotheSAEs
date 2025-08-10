@@ -4,6 +4,7 @@
 [![arXiv](https://img.shields.io/badge/arXiv-2502.04382-b31b1b)](https://arxiv.org/abs/2502.04382)
 [![website](https://img.shields.io/badge/website-hypothesaes.org-brightgreen)](https://hypothesaes.org)
 [![license](https://img.shields.io/github/license/rmovva/hypothesaes)](https://github.com/rmovva/hypothesaes/blob/main/LICENSE)
+[![python](https://img.shields.io/badge/python-3.10%E2%80%943.12-blue?logo=python)](https://www.python.org/downloads/)
 
 HypotheSAEs is a method which produces interpretable relationships ("hypotheses") in text datasets explaining how input texts are related to a target variable. 
 For example, we can use HypotheSAEs to hypothesize concepts that explain which news headlines receive engagement, or whether a congressional speech was given by a Republican or Democrat speaker. 

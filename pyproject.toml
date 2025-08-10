@@ -11,7 +11,7 @@ authors = [
 ]
 description = "Hypothesizing interpretable relationships in text datasets using sparse autoencoders."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10,<=3.12"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",

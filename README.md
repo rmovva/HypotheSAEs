@@ -55,11 +55,19 @@ You'll need enough disk space to store your text embeddings, and enough RAM to l
 The repo supports **binary classification** and **regression** tasks. For **multiclass labels**, we recommend using a one-vs-rest approach to convert the problem to binary classification.    
 You can also use HypotheSAEs to study pairwise tasks (regression or classification), e.g., whether a news headline is more likely to be clicked on than another. See the [experiment reproduction notebook](https://github.com/rmovva/hypothesaes/blob/main/notebooks/experiment_reproduction.ipynb) for an example of this on the Headlines dataset.
 
-8. **If I use the OpenAI API, how much does HypotheSAEs cost?**  
+8. **If I use OpenAI models, how much does HypotheSAEs cost?**  
 It's cheap (on the order of $1-10). See the [Cost](#cost) section for an example breakdown.
 
 9. **I heard that SAEs actually aren't useful?**  
 It depends what you're using them for; for hypothesis generation, our paper shows that SAEs outperform several strong baselines. See [this thread](https://x.com/rajivmovva/status/1952767877033173345) or our [position paper](https://arxiv.org/abs/2506.23845) for more discussion.
+
+10. **I'm getting errors about OpenAI rate limits.**  
+You can reduce the number of parallel workers for interpretation and annotation so that you stay within rate limits. See the [detailed usage notes](#detailed-usage-notes) for more details.
+
+11. **Can I use private data with HypotheSAEs?**  
+If you're using local LLMs, everything happens on your machine, so only people with access to your machine can see your data.  
+If using OpenAI: as of now (08/2025), OpenAI [doesn't train on data](https://platform.openai.com/docs/guides/your-data) sent through the API. However, they retain data for 30 days for abuse monitoring, which may or may not comply with your DUA.  
+Note that text embeddings and annotations default to being cached to your disk (wherever your package is installed). If you are using a shared machine, set your file permissions appropriately on your HypotheSAEs directory.  
 
 ## Method
 

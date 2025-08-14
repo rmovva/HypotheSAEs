@@ -8,13 +8,13 @@
 
 HypotheSAEs is a method which produces interpretable relationships ("hypotheses") in text datasets explaining how input texts are related to a target variable. 
 For example, we can use HypotheSAEs to hypothesize concepts that explain which news headlines receive engagement, or whether a congressional speech was given by a Republican or Democrat speaker. 
-The method works by training Sparse Autoencoders (SAEs) on rich embeddings of input texts, and then interpreting predictive neurons learned by the SAE.
+The method works by training Sparse Autoencoders (SAEs) on rich embeddings of input texts, and then interpreting predictive features learned by the SAE.
 
 Preprint 📄: [Sparse Autoencoders for Hypothesis Generation](https://arxiv.org/abs/2502.04382). [Rajiv Movva](https://rajivmovva.com/)\*, [Kenny Peng](https://kennypeng.me/)\*, [Nikhil Garg](https://gargnikhil.com/), [Jon Kleinberg](https://www.cs.cornell.edu/home/kleinber/), and [Emma Pierson](https://people.eecs.berkeley.edu/~emmapierson/).  
 Website 🌐: https://hypothesaes.org  
 Data 🤗: https://huggingface.co/datasets/rmovva/HypotheSAEs (to reproduce the experiments in the paper)
 
-Please open an issue or contact us at rmovva@berkeley.edu and kennypeng@cs.cornell.edu if you have any questions or suggestions.
+**Questions?** Please read the [FAQ](#faq) and README; if not addressed, open an issue or contact us at rmovva@berkeley.edu and kennypeng@cs.cornell.edu.
 
 ## Table of Contents
 
@@ -33,11 +33,13 @@ Please open an issue or contact us at rmovva@berkeley.edu and kennypeng@cs.corne
 - **Inputs:** A dataset of texts (e.g., news headlines) with a target variable (e.g., clicks). The texts are embedded using SentenceTransformers or OpenAI.
 - **Outputs:** A list of hypotheses. Each hypothesis is a natural language concept, which, when present in the text, is positively or negatively associated with the target variable.
 
-2. **How do I get started?**  
-See [Quickstart](#quickstart). The easiest way to get started is to clone and install the repo, and then adapt the [quickstart notebook](https://github.com/rmovva/hypothesaes/blob/main/notebooks/quickstart.ipynb) to your dataset.
+2. **How should I handle very long documents?**  
+Mechanically, text embeddings support up to 8192 tokens (OpenAI, ModernBERT, etc.). However, feature interpretation using long documents is difficult. For documents that are roughly >500 words, we recommend either:  
+- **Chunking**: Split the document into chunks of ~250-500 words. Each chunk inherits the same label as its parent.
+- **Summarization**: Use an LLM to summarize the document into a shorter text.
 
 3. **Why am I not getting any statistically significant hypotheses?**  
-HypotheSAEs identifies features in text embeddings that predict your target variable. Therefore, if your text embeddings do not predict your target variable _at all_, it's unlikely HypotheSAEs will find anything. To check this, before running the method, fit a simple linear model to predict your target from the text embeddings. If you see any signal on a heldout set, even if it's weak, it's worth running HypotheSAEs. However, if you see no signal at all, the method will probably not work well.
+HypotheSAEs identifies features in text embeddings that predict your target variable. If your text embeddings don't predict your target variable _at all_, it's unlikely HypotheSAEs will find anything. To check this, before running the method, fit a simple ridge regression to predict your target from the text embeddings. If you see any signal on a heldout set, even if it's weak, it's worth running HypotheSAEs. However, if you see no signal at all, the method will probably not work well.
 
 4. **Which LLMs can I use?**  
 You can use either (1) OpenAI LLMs with API calls or (2) local LLMs with vLLM. The default OpenAI LLMs are currently GPT-4.1 for interpreting SAE neurons and GPT-4.1-mini for annotating texts with concepts. The default local LLMs is `Qwen3-32B-AWQ`, which requires a GPU with ~48GB memory (e.g., A6000). Please open an issue if you require different LLMs.
@@ -47,7 +49,7 @@ You can use either (1) OpenAI LLMs with API calls or (2) local LLMs with vLLM. T
 - **If using local LLMs**: yes, you will need a reasonable GPU for LLM inference.
 
 6. **What other resources will I need?**  
-You'll need enough disk space to store your text embeddings, and enough RAM to load in the embeddings for SAE training. On an 8GB laptop, we started running out of RAM when trying to load in ~500K embeddings. It also should be possible to adapt the code to use a more efficient data loading strategy, so you don't need to fit everything in RAM.s
+You'll need enough disk space to store your text embeddings, and enough RAM to load in the embeddings for SAE training. On an 8GB laptop, we started running out of RAM when trying to load in ~500K embeddings. It also should be possible to adapt the code to use a more efficient data loading strategy, so you don't need to fit everything in RAM.
 
 7. **What types of prediction tasks does HypotheSAEs support?**  
 The repo supports **binary classification** and **regression** tasks. For **multiclass labels**, we recommend using a one-vs-rest approach to convert the problem to binary classification.    
@@ -56,15 +58,20 @@ You can also use HypotheSAEs to study pairwise tasks (regression or classificati
 8. **If I use the OpenAI API, how much does HypotheSAEs cost?**  
 It's cheap (on the order of $1-10). See the [Cost](#cost) section for an example breakdown.
 
+9. **I heard that SAEs actually aren't useful?**  
+It depends what you're using them for; for hypothesis generation, our paper shows that SAEs outperform several strong baselines. See [this thread](https://x.com/rajivmovva/status/1952767877033173345) or our [position paper](https://arxiv.org/abs/2506.23845) for more discussion.
+
 ## Method
 
-HypotheSAEs has three steps:
-0. **Embeddings**: Generate text embeddings with OpenAI API or your favorite `sentence-transformers` model.
-1. **Feature Generation**: Train a Sparse Autoencoder (SAE) on the text embeddings. This maps the embeddings from a blackbox space into a more interpretable feature space.
-2. **Feature Selection**: Select the learned SAE features which are most predictive of your target variable (e.g., ranking by correlation).
-3. **Interpretation**: Generate a natural language interpretation of each feature using an LLM. Each interpretation serves as a hypothesis about what predicts the target variable.
+HypotheSAEs has five steps:  
 
-After generating hypotheses, you can test whether they generalize on a heldout set: using only the natural language descriptions of the hypotheses, can we predict the target variable?
+1. **Embeddings**: Generate text embeddings with OpenAI API or your favorite `sentence-transformers` model.  
+2. **Feature Generation**: Train a Sparse Autoencoder (SAE) on the text embeddings. This maps the embeddings from a blackbox space into an interpretable feature space.
+3. **Feature Selection**: Select the learned SAE features which are most predictive of your target variable (e.g., with Lasso).
+4. **Feature Interpretation**: Generate a natural language interpretation of each feature using an LLM. Each interpretation serves as a hypothesis about what predicts the target variable.
+5. **Hypothesis Validation**: Use an LLM annotator to test whether the hypotheses are predictive on a heldout set. Note that this step uses *only the natural language descriptions* of the hypotheses.
+
+The figure below summarizes steps 2-4 (the core hypothesis generation procedure).
 
 <p align="center">
   <img src="HypotheSAEs_Figure1.png" width="90%" alt="HypotheSAEs Schematic">
@@ -103,6 +110,8 @@ export OPENAI_KEY_SAE="your-api-key-here"
 Alternatively, you can set the key in Python (*before* importing any HypotheSAEs functions) with `os.environ["OPENAI_KEY_SAE"] = "your-api-key"`. 
 
 ## Quickstart
+
+First, clone and install the repo ([Setup](#setup)) or install via pip. Then, use one of the [notebooks](https://github.com/rmovva/hypothesaes/tree/main/notebooks) to get started:
 
 - **See [`notebooks/quickstart.ipynb`](https://github.com/rmovva/hypothesaes/blob/main/notebooks/quickstart.ipynb) for a complete working example** on using OpenAI models. This notebook uses a 20K example subset of the Yelp restaurant review dataset. The inputs are review texts and the target variable is 1-5 star rating.  
 - See **[`notebooks/quickstart_local.ipynb`](https://github.com/rmovva/hypothesaes/blob/main/notebooks/quickstart_local.ipynb)** for an equivalent **quickstart notebook using local LLMs**. Inference is performed using your local GPU(s) with vLLM.  

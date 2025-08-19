@@ -203,6 +203,9 @@ def get_openai_embeddings(
 def get_local_embeddings(
     texts: List[str],
     model: str = "nomic-ai/modernbert-embed-base",
+    layer_idx = -2, #penultimate layer
+    component: str = "mlp", #"hidden_states", "mlp"
+    pooling: str = "mean", # "mean", "cls", "max"
     batch_size: int = 128,
     show_progress: bool = True,
     cache_name: Optional[str] = None,
@@ -212,6 +215,9 @@ def get_local_embeddings(
     """Get embeddings using local SentenceTransformer model with chunked caching."""
     # Filter out None values and empty strings
     texts = filter_invalid_texts(texts)
+
+    if cache_name:
+        cache_name = f"{cache_name}_{component}_layer{layer_idx}_{pooling}"
     
     # Setup cache
     text2embedding = load_embedding_cache(cache_name)
@@ -253,8 +259,17 @@ def get_local_embeddings(
                 prefixed_batch = [["Represent the text for classification: ", text] for text in batch]
             else:
                 prefixed_batch = batch
-            batch_embs = transformer_model.encode(prefixed_batch, batch_size=batch_size)
+            #batch_embs = transformer_model.encode(prefixed_batch, batch_size=batch_size)
             
+            batch_embs = extract_intermediate_representations(
+                transformer_model, 
+                prefixed_batch, 
+                layer_idx=layer_idx,
+                component=component,
+                pooling=pooling,
+                batch_size=batch_size
+            )
+
             for text, embedding in zip(batch, batch_embs):
                 chunk_embeddings[text] = embedding
                 text2embedding[text] = embedding
@@ -268,3 +283,158 @@ def get_local_embeddings(
         torch.cuda.empty_cache()
     
     return text2embedding
+
+
+def extract_intermediate_representations(
+    model, 
+    texts: List[str], 
+    layer_idx: int = -2,
+    component: str = "hidden_states",
+    pooling: str = "mean",
+    batch_size: int = 128
+) -> np.ndarray:
+    """Extract intermediate layer representations from SentenceTransformer model."""
+    
+    # Get the underlying transformer model
+    if hasattr(model, '_modules'):
+        # SentenceTransformer has modules, get the transformer
+        transformer = None
+        for module in model._modules.values():
+            if hasattr(module, 'auto_model'):
+                transformer = module.auto_model
+                break
+        if transformer is None:
+            # Fallback: try to get first module that looks like a transformer
+            for module in model._modules.values():
+                if hasattr(module, 'config') and hasattr(module, 'embeddings'):
+                    transformer = module
+                    break
+    else:
+        transformer = model
+    
+    if transformer is None:
+        raise ValueError("Could not find transformer model in SentenceTransformer")
+    
+    # Tokenize texts
+    tokenizer = model.tokenizer
+    encoded = tokenizer(
+        texts, 
+        return_tensors="pt", 
+        padding=True, 
+        truncation=True, 
+        max_length=512
+    ).to(model.device)
+    
+    # Store intermediate outputs
+    intermediate_outputs = []
+    
+    def hook_fn(module, input, output):
+        if component == "hidden_states":
+            # Output is usually the hidden states
+            if isinstance(output, tuple):
+                hidden_states = output[0]  # First element is usually hidden states
+            else:
+                hidden_states = output
+            intermediate_outputs.append(hidden_states.detach())
+        elif component == "mlp":
+            # For MLP output, capture the output of feed-forward layer
+            if isinstance(output, tuple):
+                mlp_output = output[0]
+            else:
+                mlp_output = output
+            intermediate_outputs.append(mlp_output.detach())
+    
+    # Register hook on the target layer
+    hook_handles = []
+    
+    if hasattr(transformer, 'encoder') and hasattr(transformer.encoder, 'layer'):
+        # BERT-like models
+        target_layer_idx = layer_idx if layer_idx >= 0 else len(transformer.encoder.layer) + layer_idx
+        target_layer = transformer.encoder.layer[target_layer_idx]
+        
+        if component == "mlp":
+            # Hook on the feed-forward network
+            if hasattr(target_layer, 'intermediate'):
+                handle = target_layer.intermediate.register_forward_hook(hook_fn)
+            elif hasattr(target_layer, 'mlp'):
+                handle = target_layer.mlp.register_forward_hook(hook_fn)
+            elif hasattr(target_layer, 'feed_forward'):
+                handle = target_layer.feed_forward.register_forward_hook(hook_fn)
+            else:
+                # Fallback: hook on the entire layer
+                handle = target_layer.register_forward_hook(hook_fn)
+        else:  # hidden_states
+            # Hook on the entire layer
+            handle = target_layer.register_forward_hook(hook_fn)
+            
+        hook_handles.append(handle)
+    
+    elif hasattr(transformer, 'layers'):
+        # Some models use 'layers' instead of 'encoder.layer'
+        target_layer_idx = layer_idx if layer_idx >= 0 else len(transformer.layers) + layer_idx
+        target_layer = transformer.layers[target_layer_idx]
+        handle = target_layer.register_forward_hook(hook_fn)
+        hook_handles.append(handle)
+    
+    else:
+        raise ValueError(f"Unsupported model architecture for layer extraction: {type(transformer)}")
+    
+    # Forward pass
+    with torch.no_grad():
+        # Set model to output hidden states if needed
+        original_output_hidden_states = getattr(transformer.config, 'output_hidden_states', False)
+        original_output_attentions = getattr(transformer.config, 'output_attentions', False)
+        
+        transformer.config.output_hidden_states = True
+        
+        try:
+            outputs = transformer(**encoded)
+            
+            # If no hook was triggered, try to extract from model outputs directly
+            if not intermediate_outputs and hasattr(outputs, 'hidden_states'):
+                if component == "hidden_states" and outputs.hidden_states:
+                    target_idx = layer_idx if layer_idx >= 0 else len(outputs.hidden_states) + layer_idx
+                    intermediate_outputs.append(outputs.hidden_states[target_idx])        
+        finally:
+            # Restore original config
+            transformer.config.output_hidden_states = original_output_hidden_states
+            transformer.config.output_attentions = original_output_attentions
+    
+    # Remove hooks
+    for handle in hook_handles:
+        handle.remove()
+    
+    if not intermediate_outputs:
+        raise ValueError(f"No {component} outputs captured from layer {layer_idx}")
+    
+    # Pool the intermediate representations
+    hidden_states = intermediate_outputs[0]  # Shape: [batch_size, seq_len, hidden_dim]
+    attention_mask = encoded['attention_mask']
+    
+
+    pooled = pool_hidden_states(hidden_states, attention_mask, pooling)
+    
+    return pooled.cpu().numpy()
+
+def pool_hidden_states(hidden_states, attention_mask, pooling: str = "mean"):
+    """Pool token-level hidden states to sentence-level representations."""
+    
+    if pooling == "cls":
+        # Use [CLS] token (first token)
+        return hidden_states[:, 0, :]
+    
+    elif pooling == "mean":
+        # Mean pooling with attention mask
+        mask_expanded = attention_mask.unsqueeze(-1).expand(hidden_states.size()).float()
+        sum_embeddings = torch.sum(hidden_states * mask_expanded, dim=1)
+        sum_mask = torch.clamp(mask_expanded.sum(dim=1), min=1e-9)
+        return sum_embeddings / sum_mask
+    
+    elif pooling == "max":
+        # Max pooling with attention mask
+        mask_expanded = attention_mask.unsqueeze(-1).expand(hidden_states.size()).float()
+        hidden_states = hidden_states.masked_fill(mask_expanded == 0, -1e9)
+        return torch.max(hidden_states, dim=1)[0]
+    
+    else:
+        raise ValueError(f"Unsupported pooling method: {pooling}")

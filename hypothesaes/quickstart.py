@@ -152,8 +152,8 @@ def interpret_sae(
     # Get activations from SAE(s)
     activations, neuron_source_sae_info = get_multiple_sae_activations(sae, X, return_neuron_source_info=True)
     print(f"Activations shape: {activations.shape}")
-    # Compute prevalence for each neuron (percentage of examples where activation > 1)
-    activation_counts = (activations > 1).sum(axis=0)
+    # Compute prevalence for each neuron (percentage of examples where activation != 0)
+    activation_counts = (activations != 0).sum(axis=0)
     activation_percent = activation_counts / activations.shape[0] * 100
     
     # Select neurons to interpret

@@ -2,6 +2,15 @@
 
 New version releases for HypotheSAEs will be documented here.
 
+## [0.3.1] - 2025-08-28
+
+### Changed
+- Avoid reloading OpenAI client on each completion
+- Cache prompts to avoid reopening file each time
+
+### Fixed
+- Bug in displaying neuron prevalences
+
 ## [0.3.0] - 2025-07-28
 
 ### Added

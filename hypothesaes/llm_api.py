@@ -4,6 +4,8 @@ import os
 import time
 import openai
 
+_CLIENT_OPENAI = None  # Module-level cache for the OpenAI client
+
 """
 These model IDs point to the latest versions of the models as of 2025-05-04.
 We point to a specific version for reproducibility, but feel free to update them as necessary.
@@ -36,12 +38,17 @@ model_abbrev_to_id = {
 DEFAULT_MODEL = "gpt-4.1-mini"
 
 def get_client():
-    """Get the OpenAI client, initializing it if necessary."""
+    """Get the OpenAI client, initializing it if necessary and caching it."""
+    global _CLIENT_OPENAI
+    if _CLIENT_OPENAI is not None:
+        return _CLIENT_OPENAI
+
     api_key = os.environ.get('OPENAI_KEY_SAE')
     if api_key is None or '...' in api_key:
         raise ValueError("Please set the OPENAI_KEY_SAE environment variable before using functions which require the OpenAI API.")
-    
-    return openai.OpenAI(api_key=api_key)
+
+    _CLIENT_OPENAI = openai.OpenAI(api_key=api_key)
+    return _CLIENT_OPENAI
 
 def get_completion(
     prompt: str,

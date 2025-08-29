@@ -6,13 +6,19 @@ from typing import List, Dict, Any, Optional
 from pathlib import Path
 import tiktoken
 
+_PROMPT_CACHE = {}
 
 def load_prompt(prompt_name: str) -> str:
-    """Load a prompt template from the prompts directory."""
+    """Load a prompt template from the prompts directory (or from cache, if already loaded)."""
+    if prompt_name in _PROMPT_CACHE:
+        return _PROMPT_CACHE[prompt_name]
+    
     prompt_path = Path(__file__).parent / "prompts" / f"{prompt_name}.txt"
     try:
         with open(prompt_path) as f:
-            return f.read()
+            content = f.read()
+            _PROMPT_CACHE[prompt_name] = content
+            return content
     except FileNotFoundError:
         raise FileNotFoundError(f"File not found: {prompt_path}; please ensure it's in the hypothesaes/prompts/ directory")
 

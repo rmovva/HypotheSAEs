@@ -457,3 +457,9 @@ If you use this code, please cite the paper:
       url={https://arxiv.org/abs/2502.04382}, 
 }
 ```
+
+## Copyright
+
+Copyright (c) 2025 the authors. Licensed under Apache 2.0.
+
+THIS SOFTWARE AND/OR DATA WAS DEPOSITED IN THE BAIR OPEN RESEARCH COMMONS REPOSITORY ON 2025-09-06.

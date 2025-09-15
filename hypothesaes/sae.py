@@ -4,6 +4,8 @@ Implementation details:
 1. Matryoshka loss: average the loss computed with increasing prefixes of neurons.
 2. Auxiliary-K reconstruction: revive dead neurons.
 3. Multi-K reconstruction: use a slightly less sparse reconstruction with lower weight.
+4. Batch Top-K sparsity (optional via flag): during training select top-(K·B) activations across the batch
+   and maintain a learned activation threshold used at inference to preserve expected sparsity.
 
 Our implementation draws from:
 - Bussmann et al. (2025) https://github.com/bartbussmann/matryoshka_sae/blob/main/sae.py (for Matryoshka loss)
@@ -37,6 +39,7 @@ class SparseAutoencoder(nn.Module):
         multi_k: Optional[int] = None,
         dead_neuron_threshold_steps: int = 256,
         prefix_lengths: Optional[List[int]] = None,
+        use_batch_topk: bool = False,
         device: str = "cuda" if torch.cuda.is_available() else "cpu",
     ) -> None:
         """Create a top-K sparse autoencoder.
@@ -54,12 +57,12 @@ class SparseAutoencoder(nn.Module):
             The default value, set during initialization, is `2 * k_active_neurons`.
             The default coefficient on the auxiliary loss is 1/32 (see `compute_loss`).
         multi_k : int | None, optional
-            How many neurons to use for the less‑sparse multi‑K reconstruction
+            How many neurons to use for the less-sparse multi-K reconstruction
             term.  The default weight on this loss is 0, and the default value
-            is None (i.e. no multi‑K reconstruction).  If using, a recommend starting 
+            is None (i.e. no multi-K reconstruction).  If using, a recommend starting 
             value is `4 * k_active_neurons`.
         dead_neuron_threshold_steps : int, optional
-            Steps of non‑activation after which a neuron counts as *dead*.
+            Steps of non-activation after which a neuron counts as *dead*.
         prefix_lengths : list[int] | None, optional
             If given (e.g. `[16, 64]`), activates *Matryoshka* loss: the first
             prefix has 16 neurons, the second 64, etc.  If *None*, all
@@ -70,6 +73,7 @@ class SparseAutoencoder(nn.Module):
         self.input_dim = input_dim
         self.m_total_neurons = m_total_neurons
         self.k_active_neurons = k_active_neurons
+        self.use_batch_topk = use_batch_topk
 
         # Fallback defaults ---------------------------------------------------
         self.aux_k = (
@@ -95,10 +99,13 @@ class SparseAutoencoder(nn.Module):
         self.input_bias = nn.Parameter(torch.zeros(input_dim))
         self.neuron_bias = nn.Parameter(torch.zeros(m_total_neurons))
 
-        # dead‑neuron bookkeeping --------------------------------------------
+        # dead-neuron bookkeeping --------------------------------------------
         self.steps_since_activation = torch.zeros(
             m_total_neurons, dtype=torch.long, device=device
         )
+
+        # Batch-Top-K threshold buffer (used only when use_batch_topk=True)
+        self.register_buffer("threshold", torch.tensor(0.0))
 
         self.device = device
         self.to(self.device)
@@ -111,13 +118,32 @@ class SparseAutoencoder(nn.Module):
         x = x - self.input_bias
         pre_act = self.encoder(x) + self.neuron_bias
 
-        # main Top‑K ---------------------------------------------------------
-        topk_vals, topk_idx = torch.topk(pre_act, self.k_active_neurons, dim=-1)
-        topk_vals = F.relu(topk_vals)
-        activ = torch.zeros_like(pre_act)
-        activ.scatter_(-1, topk_idx, topk_vals)
+        # -------- Shared: produce sparse activations 'activ' -------------
+        topk_idx = topk_vals = None  # reported only for hard Top-K
+        if not self.use_batch_topk:
+            # main Top-K ---------------------------------------------------------
+            local_vals, local_idx = torch.topk(pre_act, self.k_active_neurons, dim=-1)
+            local_vals = F.relu(local_vals)
+            activ = torch.zeros_like(pre_act)
+            activ.scatter_(-1, local_idx, local_vals)
+            topk_idx, topk_vals = local_idx, local_vals
+        else:
+            acts = F.relu(pre_act)
+            if self.training:
+                batch_size = acts.shape[0]
+                flat_acts = acts.flatten()
+                k_total = min(self.k_active_neurons * batch_size, flat_acts.numel())
+                vals_flat, idx_flat = torch.topk(flat_acts, k_total, dim=-1)
+                activ_flat = torch.zeros_like(flat_acts)
+                activ_flat.scatter_(0, idx_flat, vals_flat)
+                activ = activ_flat.view_as(acts)
+                # update learned threshold towards smallest positive activation
+                self._update_threshold_(activ)
+            else:
+                # inference-time thresholding to match expected sparsity
+                activ = torch.where(acts > self.threshold, acts, torch.zeros_like(acts))
 
-        # multi‑K --------------------------------------------------
+        # -------------------- Shared: multi-K ----------------------------
         if self.multi_k is not None:
             multik_vals, multik_idx = torch.topk(pre_act, self.multi_k, dim=-1)
             multik_vals = F.relu(multik_vals)
@@ -127,14 +153,16 @@ class SparseAutoencoder(nn.Module):
         else:
             multik_recon = None
 
-        # dead‑neuron tracking
+        # -------------------- Shared: dead-neuron tracking ---------------
         self.steps_since_activation += 1
-        self.steps_since_activation.scatter_(0, topk_idx.unique(), 0)
+        fired = (activ.sum(dim=0) > 0).nonzero(as_tuple=False).squeeze(-1)
+        if fired.numel() > 0:
+            self.steps_since_activation.index_fill_(0, fired, 0)
 
-        # reconstructions ----------------------------------------------------
+        # -------------------- Shared: reconstruction ---------------------
         recon = self.decoder(activ) + self.input_bias
 
-        # aux‑K --------------------------------------------------------------
+        # -------------------- Shared: aux-K ------------------------------
         aux_idx = aux_vals = None
         if self.aux_k is not None:
             dead_mask = (self.steps_since_activation > self.dead_neuron_threshold_steps).float()
@@ -169,7 +197,7 @@ class SparseAutoencoder(nn.Module):
         aux_coef: float,
         multi_coef: float,
     ) -> torch.Tensor:
-        """Return total loss (Matryoshka L2 + optional multi‑K + aux).
+        """Return total loss (Matryoshka L2 + optional multi-K + aux).
 
         If `len(prefix_lengths)==1` there is no Matryoshka nesting.
         Otherwise we average the L2 of every prefix reconstruction as in
@@ -191,13 +219,13 @@ class SparseAutoencoder(nn.Module):
                 l2_terms.append(self._normalized_mse(prefix_recon, x))
             main_l2 = torch.stack(l2_terms).mean()
 
-        # multi‑K term ------------------------------------------------------
+        # multi-K term ------------------------------------------------------
         if multi_coef != 0 and info["multik_reconstruction"] is not None:
             main_l2 = main_l2 + multi_coef * self._normalized_mse(
                 info["multik_reconstruction"], x
             )
 
-        # aux‑K term --------------------------------------------------------
+        # aux-K term --------------------------------------------------------
         if self.aux_k is not None and info["aux_indices"] is not None:
             err = x - recon.detach()
             aux_act = torch.zeros_like(activ)
@@ -227,6 +255,14 @@ class SparseAutoencoder(nn.Module):
         self.normalize_decoder_()
         self.encoder.weight.data = self.decoder.weight.t().clone()
         nn.init.zeros_(self.neuron_bias)
+
+    @torch.no_grad()
+    def _update_threshold_(self, activ: torch.Tensor, lr: float = 1e-2):
+        """EMA update towards the smallest positive activation in the current batch."""
+        pos = activ > 0
+        if pos.any():
+            min_pos = activ[pos].min()
+            self.threshold.mul_(1 - lr).add_(lr * min_pos)
         
     def save(self, save_path: str):
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
@@ -238,6 +274,7 @@ class SparseAutoencoder(nn.Module):
             "multi_k": self.multi_k,
             "dead_neuron_threshold_steps": self.dead_neuron_threshold_steps,
             "prefix_lengths": self.prefix_lengths,
+            "use_batch_topk": self.use_batch_topk,
         }
         torch.save({"config": config, "state_dict": self.state_dict()}, save_path, pickle_module=pickle)
         print(f"Saved model to {save_path}")
@@ -331,11 +368,14 @@ class SparseAutoencoder(nn.Module):
             
             # Update progress bar
             if show_progress:
-                iterator.set_postfix({
+                postfix = {
                     'train_loss': f'{avg_train_loss:.4f}',
                     'val_loss': f'{avg_val_loss:.4f}' if val_loader else 'N/A',
                     'dead_ratio': f'{dead_ratio:.3f}'
-                })
+                }
+                if self.use_batch_topk:
+                    postfix['threshold'] = f'{self.threshold.item():.2e}'
+                iterator.set_postfix(postfix)
         
         # Save final model
         if save_dir is not None:

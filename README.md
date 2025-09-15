@@ -209,6 +209,26 @@ This approach helps avoid the common issue where larger SAEs end up splitting hi
 
 Note: The results presented in our paper used vanilla Top-K SAEs; we haven't thoroughly tested Matryoshka Top-K SAEs yet.
 
+#### Batch Top-K sparsity
+
+Another optional change to the SAE is to use **Batch Top-K sparsity**, as described in [Bussmann et al. (2024)](https://arxiv.org/abs/2412.06410). How it works:
+
+- During training, the forward pass selects the global top $K\cdot B$ activations across a batch of size $B$. This means each example can have a different number of active features during training. 
+- The model learns an activation threshold during training and, at inference, keeps activations above this threshold, yielding approximately $K$ expected active features per example.
+
+Empirically, Batch Top-K can produce richer, less redundant features, because e.g., very short examples can be allocated fewer than K active features, while more complex examples can be allocated more.
+
+To enable:
+
+```python
+model = train_sae(
+    embeddings=train_embeddings,
+    M=256,
+    K=8,
+    batch_topk=True,  # enable Batch Top-K
+)
+```
+
 ### 2. Caching embeddings, model checkpoints, and LLM annotations for reuse
 
 By default, the library uses caching to avoid redundant computation:
@@ -295,6 +315,7 @@ model = train_sae(
     M=M,
     K=K,
     matryoshka_prefix_lengths=prefix_lengths,
+    batch_topk=True,  # Optional: enable Batch Top-K sparsity
     checkpoint_dir=checkpoint_dir,
     val_embeddings=val_embeddings,
     n_epochs=100,

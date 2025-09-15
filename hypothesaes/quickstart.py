@@ -21,6 +21,7 @@ def train_sae(
     K: int,
     *,
     matryoshka_prefix_lengths: Optional[List[int]] = None,
+    batch_topk: bool = False,
     checkpoint_dir: Optional[str] = None,
     overwrite_checkpoint: bool = False,
     val_embeddings: Optional[Union[List, np.ndarray]] = None,
@@ -43,6 +44,7 @@ def train_sae(
         M: Number of neurons in SAE
         K: Number of top-activating neurons to keep per forward pass
         matryoshka_prefix_lengths: List of prefix lengths for Matryoshka loss (None for vanilla SAE)
+        batch_topk: Whether to use batch Top-K sparsity
         checkpoint_dir: Optional directory for storing/loading SAE checkpoints
         overwrite_checkpoint: Whether to overwrite existing checkpoints
         val_embeddings: Optional validation embeddings for early stopping during SAE training
@@ -82,6 +84,7 @@ def train_sae(
         multi_k=multi_k,
         dead_neuron_threshold_steps=dead_neuron_threshold_steps,
         prefix_lengths=matryoshka_prefix_lengths,
+        use_batch_topk=batch_topk,
     )
     
     sae.fit(

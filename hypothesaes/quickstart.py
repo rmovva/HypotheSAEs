@@ -7,7 +7,7 @@ import torch
 import os
 from pathlib import Path
 
-from .sae import SparseAutoencoder, load_model, get_multiple_sae_activations, get_sae_checkpoint_name
+from .sae import SparseAutoencoder, load_model, get_sae_checkpoint_name
 from .select_neurons import select_neurons
 from .interpret_neurons import NeuronInterpreter, InterpretConfig, ScoringConfig, LLMConfig, SamplingConfig
 from .utils import get_text_for_printing
@@ -106,7 +106,7 @@ def train_sae(
 def interpret_sae(
     texts: List[str],
     embeddings: Union[List, np.ndarray],
-    sae: Union[SparseAutoencoder, List[SparseAutoencoder]],
+    sae: SparseAutoencoder,
     *,
     neuron_indices: Optional[List[int]] = None,
     n_random_neurons: Optional[int] = None,
@@ -126,7 +126,7 @@ def interpret_sae(
     Args:
         texts: Input text examples
         embeddings: Pre-computed embeddings for the input texts
-        sae: A single SAE or a list of SAEs
+        sae: A trained SAE model
         neuron_indices: Specific neuron indices to interpret (mutually exclusive with n_random_neurons and n_top_neurons)
         n_random_neurons: Number of random neurons to interpret (mutually exclusive with neuron_indices and n_top_neurons)
         n_top_neurons: Number of most prevalent neurons to interpret (mutually exclusive with neuron_indices and n_random_neurons)
@@ -152,8 +152,8 @@ def interpret_sae(
     else:
         X = embeddings
     
-    # Get activations from SAE(s)
-    activations, neuron_source_sae_info = get_multiple_sae_activations(sae, X, return_neuron_source_info=True)
+    # Get activations from SAE
+    activations = sae.get_activations(X)
     print(f"Activations shape: {activations.shape}")
     # Compute prevalence for each neuron (percentage of examples where activation != 0)
     activation_counts = (activations != 0).sum(axis=0)
@@ -201,14 +201,13 @@ def interpret_sae(
         neuron_activations = activations[:, idx]
         result_dict = {
             "neuron_idx": int(idx),
-            "source_sae": neuron_source_sae_info[idx],
             "interpretation": interpretations[idx][0] if n_candidates == 1 else interpretations[idx]
         }
         
         if print_examples_n > 0:
             top_indices = np.argsort(neuron_activations)[-print_examples_n:][::-1]
             top_examples = [texts[i] for i in top_indices]
-            print(f"\nNeuron {idx} ({activation_percent[idx]:.1f}% active, from SAE M={neuron_source_sae_info[idx][1]}, K={neuron_source_sae_info[idx][2]}): {interpretations[idx][0]}")
+            print(f"\nNeuron {idx} ({activation_percent[idx]:.1f}% active): {interpretations[idx][0]}")
             print(f"\nTop activating examples:")
             for i, example in enumerate(top_examples, 1):
                 print(f"{i}. {get_text_for_printing(example, max_chars=print_examples_max_chars)}")
@@ -223,7 +222,7 @@ def generate_hypotheses(
     texts: List[str],
     labels: Union[List[int], List[float], np.ndarray],
     embeddings: Union[List, np.ndarray],
-    sae: Union[SparseAutoencoder, List[SparseAutoencoder]],
+    sae: SparseAutoencoder,
     *,
     cache_name: Optional[str] = None,
     classification: Optional[bool] = None,
@@ -248,7 +247,7 @@ def generate_hypotheses(
         texts: Input text examples
         labels: Target labels (binary for classification, continuous for regression)
         embeddings: Pre-computed embeddings for the input texts (list or numpy array)
-        sae: A single SAE or a list of SAEs
+        sae: A trained SAE model
         cache_name: Optional string prefix for caching annotations
         classification: Whether this is a classification task. If None, inferred from labels
         selection_method: Method for selecting predictive neurons ('separation_score', 'correlation', 'lasso')
@@ -275,8 +274,8 @@ def generate_hypotheses(
     
     print(f"Embeddings shape: {embeddings.shape}")
 
-    # Get activations from SAE(s)
-    activations, neuron_source_sae_info = get_multiple_sae_activations(sae, X, return_neuron_source_info=True)
+    # Get activations from SAE
+    activations = sae.get_activations(X)
     print(f"Activations shape: {activations.shape}")
 
     print(f"\nStep 1: Selecting top {n_selected_neurons} predictive neurons")
@@ -328,7 +327,6 @@ def generate_hypotheses(
         for idx, score in zip(selected_neurons, scores):
             results.append({
                 'neuron_idx': idx,
-                'source_sae': neuron_source_sae_info[idx],
                 f'target_{selection_method}': score,
                 'interpretation': interpretations[idx][0]
             })
@@ -352,7 +350,6 @@ def generate_hypotheses(
             
             results.append({
                 'neuron_idx': idx,
-                'source_sae': neuron_source_sae_info[idx],
                 f'target_{selection_method}': score,
                 'interpretation': best_interp,
                 f'{scoring_metric}_fidelity_score': best_score

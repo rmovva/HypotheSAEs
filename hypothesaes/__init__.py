@@ -10,8 +10,7 @@ from .quickstart import (
 
 from .sae import (
     SparseAutoencoder,
-    load_model,
-    get_multiple_sae_activations
+    load_model
 )
 
 from .embedding import (
@@ -46,7 +45,6 @@ __all__ = [
     # Core classes
     "SparseAutoencoder",
     "load_model",
-    "get_multiple_sae_activations",
     
     # Embedding functions
     "get_openai_embeddings",

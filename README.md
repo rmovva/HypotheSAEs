@@ -274,7 +274,7 @@ Required parameters:
 - `texts`: List of text examples to analyze
 - `labels`: Binary (0/1) or continuous labels for classification/regression
 - `embeddings`: Pre-computed embeddings for the input texts
-- `sae`: A trained SAE model or list of SAE models
+- `sae`: A trained SAE model
 - `cache_name`: String prefix for storing model checkpoints and caches
 
 Optional parameters:

@@ -2,6 +2,16 @@
 
 New version releases for HypotheSAEs will be documented here.
 
+## [1.0.0] - 2025-09-15
+
+Incrementing to 1.0.0 because multi-SAE hypothesis generation has been removed, in favor of Matryoshka SAEs.
+
+### Added
+- Support for Batch Top-K sparsity in SAEs (off by default)
+
+### Changed
+- The repo no longer supports passing in multiple SAE models to `generate_hypotheses()` or other quickstart functions. Training multiple SAEs is mostly deprecated by Matryoshka SAEs. It is also not hard to implement hypothesis generation with multiple SAEs, if you would like.
+
 ## [0.3.1] - 2025-08-28
 
 ### Changed

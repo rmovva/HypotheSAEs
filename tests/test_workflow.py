@@ -85,14 +85,13 @@ def test_interpret_sae(test_data):
     """Test interpreting neurons from trained SAEs."""
     sentences = test_data["sentences"]
     embeddings = test_data["local_embeddings"]
-    sae_small = train_sae(embeddings=embeddings, M=2, K=1, n_epochs=3)
-    sae_large = train_sae(embeddings=embeddings, M=4, K=2, n_epochs=3)
+    sae = train_sae(embeddings=embeddings, M=4, K=2, n_epochs=3)
 
-    # Test interpret_sae with both SAEs
+    # Test interpret_sae with single SAE
     interpretations = interpret_sae(
         texts=sentences,
         embeddings=embeddings,
-        sae=[sae_small, sae_large],
+        sae=sae,
         n_random_neurons=2,
         interpreter_model="gpt-4o",  # Use smaller model for testing
         annotator_model="gpt-4o-mini",
@@ -108,15 +107,14 @@ def test_generate_and_evaluate_hypotheses(test_data):
     sentences = test_data["sentences"]
     labels = test_data["labels"]
     embeddings = test_data["local_embeddings"]
-    sae_small = train_sae(embeddings=embeddings, M=2, K=1, n_epochs=3)
-    sae_large = train_sae(embeddings=embeddings, M=4, K=2, n_epochs=3)
+    sae = train_sae(embeddings=embeddings, M=4, K=2, n_epochs=3)
 
     # Generate hypotheses
     hypotheses_df = generate_hypotheses(
         texts=sentences,
         labels=labels,
         embeddings=embeddings,
-        sae=[sae_small, sae_large],
+        sae=sae,
         classification=True,
         n_selected_neurons=2,  # Small number for testing
         interpreter_model="gpt-4o",

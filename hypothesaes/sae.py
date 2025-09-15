@@ -442,21 +442,3 @@ def load_model(path: str, device: str = "cuda" if torch.cuda.is_available() else
     model.load_state_dict(ckpt["state_dict"])
     print(f"Loaded model from {path} onto device {model.device}")
     return model
-
-def get_multiple_sae_activations(sae_list, X, return_neuron_source_info=False, **kwargs):
-    if not isinstance(sae_list, list):
-        sae_list = [sae_list]
-    if not isinstance(X, torch.Tensor):
-        X = torch.tensor(X, dtype=torch.float)
-
-    activations_list = []
-    neuron_source_sae_info = []
-    for (idx, s) in enumerate(sae_list):
-        activations_list.append(s.get_activations(X, **kwargs))
-        neuron_source_sae_info += [(f'SAE_{idx}', s.m_total_neurons, s.k_active_neurons)] * s.m_total_neurons
-    activations = np.concatenate(activations_list, axis=1)
-    
-    if return_neuron_source_info:
-        return activations, neuron_source_sae_info
-    else:
-        return activations

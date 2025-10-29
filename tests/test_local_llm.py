@@ -1,12 +1,20 @@
 import numpy as np
+import pytest
 from hypothesaes import get_local_embeddings, train_sae
 from hypothesaes import NeuronInterpreter, InterpretConfig, LLMConfig, SamplingConfig
 from hypothesaes.annotate import annotate
+from hypothesaes.llm_local import shutdown_all_vllm_engines
 
 from .sentences import BLUE_SENTENCES, RED_SENTENCES, ALL_TEST_SENTENCES
 
 LOCAL_EMBEDDER = "sentence-transformers/all-MiniLM-L6-v2"
 LOCAL_LLM = "Qwen/Qwen3-8B"
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _cleanup_vllm_engines():
+    yield
+    shutdown_all_vllm_engines()
 
 def test_local_interpretation():
     texts = BLUE_SENTENCES + RED_SENTENCES

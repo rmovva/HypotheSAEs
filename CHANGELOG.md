@@ -2,6 +2,12 @@
 
 New version releases for HypotheSAEs will be documented here.
 
+## [1.1.0] - 2025-10-29
+
+1. Previously we had some dependency issues with scipy and Python 3.13, these seem to have been fix, so package install now allows 3.13.
+2. Fixed a couple of bugs that arose from changing versions of HypotheSAEs in the test scripts, so the tests should now work with `pytest -v tests/`.
+3. Fixed some vLLM bugs.
+
 ## [1.0.0] - 2025-09-15
 
 Incrementing to 1.0.0 because multi-SAE hypothesis generation has been removed, in favor of Matryoshka SAEs.

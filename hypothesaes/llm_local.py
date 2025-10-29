@@ -73,6 +73,16 @@ def get_vllm_engine(model: str, **kwargs) -> LLM:
 
     return engine
 
+def shutdown_all_vllm_engines() -> None:
+    """Shut down and clear any cached vLLM engines to release GPU resources."""
+    global _LOCAL_ENGINES
+    for name, engine in list(_LOCAL_ENGINES.items()):
+        try:
+            engine.llm_engine.engine_core.shutdown()
+        except Exception as exc:
+            print(f"Warning: failed to shut down vLLM engine '{name}': {exc}")
+    _LOCAL_ENGINES.clear()
+
 def get_local_completions(
     prompts: List[str],
     model: str = "Qwen/Qwen3-0.6B",

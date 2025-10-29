@@ -59,7 +59,7 @@ def get_vllm_engine(model: str, **kwargs) -> LLM:
         print(f"Loading {model} in vLLM...")
         t0 = time.time()
         gpu_memory_utilization = kwargs.pop("gpu_memory_utilization", 0.85)
-        engine = LLM(model=model, task="generate", enable_sleep_mode=True, gpu_memory_utilization=gpu_memory_utilization, **kwargs)
+        engine = LLM(model=model, enable_sleep_mode=True, gpu_memory_utilization=gpu_memory_utilization, **kwargs)
         _LOCAL_ENGINES[model] = engine
         dtype = getattr(engine.llm_engine.get_model_config(), "dtype", "unknown")
         print(f"Loaded {model} with dtype: {dtype} (took {time.time()-t0:.1f}s)")

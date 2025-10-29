@@ -46,7 +46,7 @@ def test_openai_client():
     """Test the OpenAI client."""
     test_completion = get_completion(
         prompt="Reply with 'Hello, world!'",
-        model="gpt-4o-mini",
+        model="gpt-4.1-mini",
         max_tokens=1,
     )
     assert test_completion is not None
@@ -93,8 +93,7 @@ def test_interpret_sae(test_data):
         embeddings=embeddings,
         sae=sae,
         n_random_neurons=2,
-        interpreter_model="gpt-4o",  # Use smaller model for testing
-        annotator_model="gpt-4o-mini",
+        interpreter_model="gpt-4.1-mini",  # Use smaller model for testing
         n_examples_for_interpretation=10,  # Small number for testing
         print_examples_n=3
     )
@@ -117,11 +116,11 @@ def test_generate_and_evaluate_hypotheses(test_data):
         sae=sae,
         classification=True,
         n_selected_neurons=2,  # Small number for testing
-        interpreter_model="gpt-4o",
-        annotator_model="gpt-4o-mini",
+        interpreter_model="gpt-4.1",
+        annotator_model="gpt-4.1-mini",
         n_examples_for_interpretation=10,
         n_scoring_examples=10,
-        n_workers_annotation=100
+        n_workers_annotation=10
     )
     
     # Verify hypotheses structure
@@ -135,8 +134,8 @@ def test_generate_and_evaluate_hypotheses(test_data):
         hypotheses_df=hypotheses_df,
         texts=sentences,
         labels=labels,
-        annotator_model="gpt-4o-mini",
-        n_workers_annotation=100
+        annotator_model="gpt-4.1-mini",
+        n_workers_annotation=10
     )
     
     # Verify evaluation structure

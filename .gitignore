@@ -10,6 +10,7 @@ data/*
 *cache*
 notebooks/testing_notebook.ipynb
 local_llm_experiments/results/*
+AGENTS.md
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

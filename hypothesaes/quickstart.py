@@ -2,7 +2,7 @@
 
 import numpy as np
 import pandas as pd
-from typing import List, Optional, Union, Tuple, Dict
+from typing import Any, List, Optional, Union, Tuple, Dict
 import torch
 import os
 from pathlib import Path
@@ -111,11 +111,12 @@ def interpret_sae(
     neuron_indices: Optional[List[int]] = None,
     n_random_neurons: Optional[int] = None,
     n_top_neurons: Optional[int] = None,
-    interpreter_model: str = "gpt-4.1",
+    interpreter_model: str = "gpt-5.2",
     n_examples_for_interpretation: int = 20,
     max_words_per_example: int = 256,
     interpret_temperature: float = 0.7,
     max_interpretation_tokens: int = 50,
+    interpret_llm_kwargs: Optional[Dict[str, Any]] = None,
     n_candidates: int = 1,
     print_examples_n: int = 3,
     print_examples_max_chars: int = 1024,
@@ -135,6 +136,7 @@ def interpret_sae(
         max_words_per_example: Maximum words per text to prompt the interpreter LLM with
         temperature: Temperature for LLM generation
         max_interpretation_tokens: Maximum tokens for interpretation
+        interpret_llm_kwargs: Additional kwargs forwarded to the LLM API (e.g. reasoning_effort, verbosity)
         n_candidates: Number of candidate interpretations per neuron
         print_examples_n: Number of top activating examples to print (0 to disable)
         print_examples_max_chars: Maximum characters per example to print (None to print full text)
@@ -181,7 +183,8 @@ def interpret_sae(
         ),
         llm=LLMConfig(
             temperature=interpret_temperature,
-            max_interpretation_tokens=max_interpretation_tokens,
+            max_output_tokens=max_interpretation_tokens,
+            llm_kwargs=interpret_llm_kwargs or {},
         ),
         n_candidates=n_candidates,
         task_specific_instructions=task_specific_instructions,
@@ -228,12 +231,14 @@ def generate_hypotheses(
     classification: Optional[bool] = None,
     selection_method: str = "separation_score",
     n_selected_neurons: int = 20,
-    interpreter_model: str = "gpt-4.1",
-    annotator_model: str = "gpt-4.1-mini",
+    interpreter_model: str = "gpt-5.2",
+    annotator_model: str = "gpt-5-mini",
     n_examples_for_interpretation: int = 20,
     max_words_per_example: int = 256,
     interpret_temperature: float = 0.7,
     max_interpretation_tokens: int = 50,
+    interpret_llm_kwargs: Optional[Dict[str, Any]] = None,
+    annotation_llm_kwargs: Optional[Dict[str, Any]] = None,
     n_candidate_interpretations: int = 1,
     n_scoring_examples: int = 100,
     scoring_metric: str = "f1",
@@ -258,6 +263,8 @@ def generate_hypotheses(
         n_scoring_examples: Number of examples to use when scoring interpretations
         scoring_metric: Metric to use for ranking interpretations ('f1', 'precision', 'recall', 'correlation')
         task_specific_instructions: Optional task-specific instructions to include in the interpretation prompt
+        interpret_llm_kwargs: Additional kwargs forwarded to interpretation requests
+        annotation_llm_kwargs: Additional kwargs forwarded to annotation/scoring requests
 
     Returns:
         DataFrame with columns: neuron_idx, target_{selection_method}, interpretation, interp_{scoring_metric}
@@ -307,7 +314,8 @@ def generate_hypotheses(
         ),
         llm=LLMConfig(
             temperature=interpret_temperature,
-            max_interpretation_tokens=max_interpretation_tokens,
+            max_output_tokens=max_interpretation_tokens,
+            llm_kwargs=interpret_llm_kwargs or {},
         ),
         n_candidates=n_candidate_interpretations,
         task_specific_instructions=task_specific_instructions,
@@ -337,7 +345,8 @@ def generate_hypotheses(
             texts=texts,
             activations=activations,
             interpretations=interpretations,
-            config=scoring_config
+            config=scoring_config,
+            **(annotation_llm_kwargs or {}),
         )
         
         for idx, score in zip(selected_neurons, scores):
@@ -364,11 +373,12 @@ def evaluate_hypotheses(
     labels: Union[List[int], List[float], np.ndarray],
     *,
     cache_name: Optional[str] = None,
-    annotator_model: str = "gpt-4.1-mini",
+    annotator_model: str = "gpt-5-mini",
     max_words_per_example: int = 256,
     classification: Optional[bool] = None,
     n_workers_annotation: int = 30,
     corrected_pval_threshold: float = 0.1,
+    annotation_llm_kwargs: Optional[Dict[str, Any]] = None,
 ) -> pd.DataFrame:
     """Evaluate hypotheses on a heldout dataset.
     
@@ -380,6 +390,7 @@ def evaluate_hypotheses(
         max_words_per_example: Maximum words per example for annotation
         classification: Whether this is a classification task. If None, inferred from labels
         cache_name: Optional string prefix for storing annotation cache
+        annotation_llm_kwargs: Additional kwargs forwarded to annotation requests
         
     Returns:
         DataFrame with original columns plus evaluation metrics
@@ -402,6 +413,7 @@ def evaluate_hypotheses(
         model=annotator_model,
         cache_name=cache_name,
         n_workers=n_workers_annotation,
+        **(annotation_llm_kwargs or {}),
     )
     
     # Step 2: Evaluate annotations against the true labels

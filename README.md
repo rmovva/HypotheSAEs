@@ -42,11 +42,11 @@ Mechanically, text embeddings support up to 8192 tokens (OpenAI, ModernBERT, etc
 HypotheSAEs identifies features in text embeddings that predict your target variable. If your text embeddings don't predict your target variable _at all_, it's unlikely HypotheSAEs will find anything. To check this, before running the method, fit a simple ridge regression to predict your target from the text embeddings. If you see any signal on a heldout set, even if it's weak, it's worth running HypotheSAEs. However, if you see no signal at all, the method will probably not work well.
 
 4. **Which LLMs can I use?**  
-You can use either (1) OpenAI LLMs with API calls or (2) local LLMs with vLLM. The default OpenAI LLMs are currently GPT-4.1 for interpreting SAE neurons and GPT-4.1-mini for annotating texts with concepts. The default local LLMs is `Qwen3-32B-AWQ`, which requires a GPU with ~48GB memory (e.g., A6000). Please open an issue if you require different LLMs.
+You can use OpenAI models or any OpenAI-compatible API endpoint (including vLLM server mode). The default models are GPT-5.2 for interpretation and GPT-5-mini for annotation. If you run your own endpoint, set `OPENAI_BASE_URL` and pass the served model name.
 
 5. **Do I need a GPU?**  
 - **If using OpenAI LLMs**: no, since all LLM use is via API calls. Training the SAE will be faster on GPU, but it shouldn't be prohibitively slow even on a laptop.  
-- **If using local LLMs**: yes, you will need a reasonable GPU for LLM inference.
+- **If using your own OpenAI-compatible endpoint (e.g. vLLM server)**: yes, you will need a reasonable GPU for that server.
 
 6. **What other resources will I need?**  
 You'll need enough disk space to store your text embeddings, and enough RAM to load in the embeddings for SAE training. On an 8GB laptop, we started running out of RAM when trying to load in ~500K embeddings. It also should be possible to adapt the code to use a more efficient data loading strategy, so you don't need to fit everything in RAM.
@@ -65,7 +65,7 @@ It depends what you're using them for; for hypothesis generation, our paper show
 You can reduce the number of parallel workers for interpretation and annotation so that you stay within rate limits. See the [detailed usage notes](#detailed-usage-notes) for more details.
 
 11. **Can I use private data with HypotheSAEs?**  
-If you're using local LLMs, everything happens on your machine, so only people with access to your machine can see your data.  
+If you're using your own OpenAI-compatible endpoint on a local machine, everything happens on your machine, so only people with access to your machine can see your data.  
 If using OpenAI: as of now (08/2025), OpenAI [doesn't train on data](https://platform.openai.com/docs/guides/your-data) sent through the API. However, they retain data for 30 days for abuse monitoring, which may or may not comply with your DUA.  
 Note that text embeddings and annotations default to being cached to your disk (wherever your package is installed). If you are using a shared machine, set your file permissions appropriately on your HypotheSAEs directory.  
 
@@ -117,12 +117,17 @@ export OPENAI_KEY_SAE="your-api-key-here"
 ```
 Alternatively, you can set the key in Python (*before* importing any HypotheSAEs functions) with `os.environ["OPENAI_KEY_SAE"] = "your-api-key"`. 
 
+To use a local OpenAI-compatible endpoint (e.g., vLLM server), also set:
+```bash
+export OPENAI_BASE_URL="http://0.0.0.0:8000/v1"
+```
+
 ## Quickstart
 
 First, clone and install the repo ([Setup](#setup)) or install via pip. Then, use one of the [notebooks](https://github.com/rmovva/hypothesaes/tree/main/notebooks) to get started:
 
 - **See [`notebooks/quickstart.ipynb`](https://github.com/rmovva/hypothesaes/blob/main/notebooks/quickstart.ipynb) for a complete working example** on using OpenAI models. This notebook uses a 20K example subset of the Yelp restaurant review dataset. The inputs are review texts and the target variable is 1-5 star rating.  
-- See **[`notebooks/quickstart_local.ipynb`](https://github.com/rmovva/hypothesaes/blob/main/notebooks/quickstart_local.ipynb)** for an equivalent **quickstart notebook using local LLMs**. Inference is performed using your local GPU(s) with vLLM.  
+- See **[`notebooks/quickstart_local.ipynb`](https://github.com/rmovva/hypothesaes/blob/main/notebooks/quickstart_local.ipynb)** for an equivalent **quickstart notebook using a local OpenAI-compatible endpoint** (e.g., vLLM server).  
 - See **[`notebooks/experiment_reproduction.ipynb`](https://github.com/rmovva/hypothesaes/blob/main/notebooks/experiment_reproduction.ipynb)** to **reproduce the results in the paper**.
 
 For many use cases, adapting the quickstart notebook should be sufficient. The notebooks contain substantial documentation for each step.  
@@ -151,10 +156,10 @@ Additionally, we output the evaluation metrics used in the paper:
 
 Generating hypotheses using 20K Yelp reviews on the quickstart dataset takes ~2 minutes and costs ~$0.40:
 - $0.05 for text embeddings (OpenAI text-embedding-3-small). This cost scales with dataset size.
-- $0.15 to interpret neurons (GPT-4.1). This cost scales with the number of neurons you interpret (but not with dataset size).
-- $0.19 to score interpretation fidelity (GPT-4.1-mini). This step isn't strictly necessary, and its cost also only scales with the number of neurons you interpret.
+- $0.15 to interpret neurons (GPT-5.2). This cost scales with the number of neurons you interpret (but not with dataset size).
+- $0.19 to score interpretation fidelity (GPT-5-mini). This step isn't strictly necessary, and its cost also only scales with the number of neurons you interpret.
 
-Evaluating hypothesis generalization for 20 hypotheses on a heldout set of 2K reviews requires 40K annotations. With GPT-4.1-mini, this costs $3.50 and takes ~10 minutes using 30 parallel workers (the default value, but this may need to be reduced depending on your token rate limits).
+Evaluating hypothesis generalization for 20 hypotheses on a heldout set of 2K reviews requires 40K annotations. With GPT-5-mini, this costs $3.50 and takes ~10 minutes using 30 parallel workers (the default value, but this may need to be reduced depending on your token rate limits).
 
 ## Tips for better results
 
@@ -170,7 +175,7 @@ Less important:
 
 4. **Sampling texts for interpretation**: By default, we interpret a neuron by prompting an LLM with the top-10 texts that activate the neuron most strongly (and 10 random texts that do not activate the neuron). This can produce overly specific labels. If you run into this issue, you can instead sample 10 texts from the top decile or quintile of positive activations instead of the absolute top-10. See `notebooks/experiment_reproduction.ipynb` to see how we do this (we use this binned sampling strategy to produce the results in the paper).
 
-5. **Scoring interpretation fidelity**: Sometimes, the LLM interpretation of a neuron will not actually summarize the neuron's activation pattern. One strategy to mitigate this issue is to generate 3 candidate interpretations per neuron, score each one, and use the top-scoring one. You can do this by setting `n_candidate_interpretations=3` in `generate_hypotheses()`. Scoring works by using a separate annotator LLM (default `gpt-4.1-mini`) to annotate several top-activating and zero-activating examples according to the interpretation, and then computing F1-score (you can also choose to select based on precision, recall, or correlation instead).
+5. **Scoring interpretation fidelity**: Sometimes, the LLM interpretation of a neuron will not actually summarize the neuron's activation pattern. One strategy to mitigate this issue is to generate 3 candidate interpretations per neuron, score each one, and use the top-scoring one. You can do this by setting `n_candidate_interpretations=3` in `generate_hypotheses()`. Scoring works by using a separate annotator LLM (default `gpt-5-mini`) to annotate several top-activating and zero-activating examples according to the interpretation, and then computing F1-score (you can also choose to select based on precision, recall, or correlation instead).
 
 ### 1. Choosing SAE hyperparameters (M, K, Matryoshka prefixes)
 
@@ -281,8 +286,8 @@ Optional parameters:
 - `classification`: Whether this is a classification task (auto-detected if not specified)
 - `selection_method`: How to select predictive neurons ("separation_score", "correlation", "lasso"; default: "separation_score")
 - `n_selected_neurons`: Number of neurons to interpret (default: 20)
-- `interpreter_model`: LLM for generating interpretations (default: "gpt-4.1")
-- `annotator_model`: LLM for scoring interpretations (default: "gpt-4.1-mini")
+- `interpreter_model`: LLM for generating interpretations (default: "gpt-5.2")
+- `annotator_model`: LLM for scoring interpretations (default: "gpt-5-mini")
 - `n_examples_for_interpretation`: Number of examples to use for interpretation (default: 20)
 - `max_words_per_example`: Maximum words per example when prompting the interpreter LLM (default: 256)
 - `interpret_temperature`: Temperature for interpretation generation (default: 0.7)
@@ -375,8 +380,8 @@ Features should describe a specific aspect of the review. For example:
 
 # Initialize the interpreter
 interpreter = NeuronInterpreter(
-    interpreter_model="gpt-4.1",  # Model for generating interpretations
-    annotator_model="gpt-4.1-mini",  # Model for scoring interpretations
+    interpreter_model="gpt-5.2",  # Model for generating interpretations
+    annotator_model="gpt-5-mini",  # Model for scoring interpretations
     n_workers_interpretation=10,  # Parallel workers for interpretation
     n_workers_annotation=50,  # Parallel workers for annotation
     cache_name="my_dataset",  # Cache name for storing annotations
@@ -449,7 +454,7 @@ holdout_metrics, holdout_hypothesis_df = score_hypotheses(
     hypothesis_annotations=holdout_annotations,
     y_true=holdout_labels,
     classification=False,
-    annotator_model="gpt-4.1-mini",
+    annotator_model="gpt-5-mini",
     n_workers_annotation=50,
 )
 

@@ -52,6 +52,31 @@ def test_openai_client():
     assert test_completion is not None
     assert len(test_completion) > 0
 
+def test_local_openai_base_url():
+    """Test using a local OpenAI-compatible endpoint."""
+    if os.getenv("RUN_LOCAL_OPENAI_TEST") != "1":
+        pytest.skip("Set RUN_LOCAL_OPENAI_TEST=1 to run local OpenAI-compatible endpoint test.")
+
+    base_url = os.getenv("LOCAL_OPENAI_BASE_URL", "http://0.0.0.0:8000/v1")
+    model = os.getenv("LOCAL_OPENAI_MODEL", "Qwen/Qwen3-8B")
+
+    previous_base_url = os.environ.get("OPENAI_BASE_URL")
+    try:
+        os.environ["OPENAI_BASE_URL"] = base_url
+        test_completion = get_completion(
+            prompt="Reply with 'Hello, world!'",
+            model=model,
+            max_output_tokens=16,
+            temperature=0.0,
+        )
+        assert test_completion is not None
+        assert len(test_completion.strip()) > 0
+    finally:
+        if previous_base_url is None:
+            os.environ.pop("OPENAI_BASE_URL", None)
+        else:
+            os.environ["OPENAI_BASE_URL"] = previous_base_url
+
 def test_compute_openai_embeddings(test_data):
     """Test computing embeddings using OpenAI models."""
     sentences = test_data["sentences"]

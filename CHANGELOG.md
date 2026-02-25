@@ -2,6 +2,17 @@
 
 New version releases for HypotheSAEs will be documented here.
 
+## [Unreleased]
+
+### Changed
+- LLM requests now use the OpenAI Responses API via a unified inference path for all models.
+- Added `OPENAI_BASE_URL` support so OpenAI-compatible endpoints (e.g., vLLM server mode) can be used without separate local-model routing.
+- Annotation and interpretation now accept flexible request kwargs (for example `reasoning_effort`, `verbosity`, and token controls) instead of hard-coding model-specific argument branches.
+- Updated default interpreter/annotator model names to `gpt-5.2` and `gpt-5-mini`.
+
+### Added
+- Optional test coverage for local OpenAI-compatible endpoints (guarded by `RUN_LOCAL_OPENAI_TEST=1`).
+
 ## [1.1.0] - 2025-10-29
 
 1. Previously we had some dependency issues with scipy and Python 3.13, these seem to have been fix, so package install now allows 3.13.

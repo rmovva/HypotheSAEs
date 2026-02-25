@@ -127,7 +127,7 @@ export OPENAI_BASE_URL="http://0.0.0.0:8000/v1"
 First, clone and install the repo ([Setup](#setup)) or install via pip. Then, use one of the [notebooks](https://github.com/rmovva/hypothesaes/tree/main/notebooks) to get started:
 
 - **See [`notebooks/quickstart.ipynb`](https://github.com/rmovva/hypothesaes/blob/main/notebooks/quickstart.ipynb) for a complete working example** on using OpenAI models. This notebook uses a 20K example subset of the Yelp restaurant review dataset. The inputs are review texts and the target variable is 1-5 star rating.  
-- See **[`notebooks/quickstart_local.ipynb`](https://github.com/rmovva/hypothesaes/blob/main/notebooks/quickstart_local.ipynb)** for an equivalent **quickstart notebook using a local OpenAI-compatible endpoint** (e.g., vLLM server).  
+- See **[`notebooks/quickstart_local.ipynb`](https://github.com/rmovva/hypothesaes/blob/main/notebooks/quickstart_local.ipynb)** for a local quickstart reference. For the unified API path, run a local OpenAI-compatible endpoint (e.g., vLLM server) and set `OPENAI_BASE_URL`.  
 - See **[`notebooks/experiment_reproduction.ipynb`](https://github.com/rmovva/hypothesaes/blob/main/notebooks/experiment_reproduction.ipynb)** to **reproduce the results in the paper**.
 
 For many use cases, adapting the quickstart notebook should be sufficient. The notebooks contain substantial documentation for each step.  

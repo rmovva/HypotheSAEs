@@ -84,10 +84,15 @@ def annotate_single_text(
     for attempt in range(max_retries):
         try:
             start_time = time.time()
+            resolved_reasoning_effort = reasoning_effort
+            if resolved_reasoning_effort is None:
+                model_name = model.lower()
+                if model_name.startswith("gpt-5") or model_name.startswith("gpt5"):
+                    resolved_reasoning_effort = "low"
             request_kwargs = normalize_llm_kwargs(
                 completion_kwargs,
                 default_verbosity=verbosity,
-                default_reasoning_effort=reasoning_effort,
+                default_reasoning_effort=resolved_reasoning_effort,
                 default_timeout=timeout,
                 default_max_output_tokens=max_output_tokens,
             )

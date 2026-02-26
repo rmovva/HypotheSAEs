@@ -47,7 +47,6 @@ def test_openai_client():
     test_completion = get_completion(
         prompt="Reply with 'Hello, world!'",
         model="gpt-4.1-mini",
-        max_tokens=1,
     )
     assert test_completion is not None
     assert len(test_completion) > 0

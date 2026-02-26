@@ -115,7 +115,7 @@ def interpret_sae(
     n_examples_for_interpretation: int = 20,
     max_words_per_example: int = 256,
     interpret_temperature: float = 0.7,
-    max_interpretation_tokens: int = 50,
+    max_interpretation_tokens: Optional[int] = None,
     interpret_llm_kwargs: Optional[Dict[str, Any]] = None,
     n_candidates: int = 1,
     print_examples_n: int = 3,
@@ -135,7 +135,7 @@ def interpret_sae(
         n_examples: Number of examples to use for interpretation
         max_words_per_example: Maximum words per text to prompt the interpreter LLM with
         temperature: Temperature for LLM generation
-        max_interpretation_tokens: Maximum tokens for interpretation
+        max_interpretation_tokens: Optional max tokens for interpretation; None leaves uncapped
         interpret_llm_kwargs: Additional kwargs forwarded to the LLM API (e.g. reasoning_effort, verbosity)
         n_candidates: Number of candidate interpretations per neuron
         print_examples_n: Number of top activating examples to print (0 to disable)
@@ -184,6 +184,7 @@ def interpret_sae(
         llm=LLMConfig(
             temperature=interpret_temperature,
             max_output_tokens=max_interpretation_tokens,
+            reasoning_effort=None,
             llm_kwargs=interpret_llm_kwargs or {},
         ),
         n_candidates=n_candidates,
@@ -236,7 +237,7 @@ def generate_hypotheses(
     n_examples_for_interpretation: int = 20,
     max_words_per_example: int = 256,
     interpret_temperature: float = 0.7,
-    max_interpretation_tokens: int = 50,
+    max_interpretation_tokens: Optional[int] = None,
     interpret_llm_kwargs: Optional[Dict[str, Any]] = None,
     annotation_llm_kwargs: Optional[Dict[str, Any]] = None,
     n_candidate_interpretations: int = 1,
@@ -315,6 +316,7 @@ def generate_hypotheses(
         llm=LLMConfig(
             temperature=interpret_temperature,
             max_output_tokens=max_interpretation_tokens,
+            reasoning_effort=None,
             llm_kwargs=interpret_llm_kwargs or {},
         ),
         n_candidates=n_candidate_interpretations,

@@ -32,12 +32,6 @@ model_abbrev_to_id = {
     "gpt-4.1-nano": "gpt-4.1-nano",
     "gpt5.2": "gpt-5.2",
     "gpt-5.2": "gpt-5.2",
-    "gpt5.2-chat-latest": "gpt-5.2-chat-latest",
-    "gpt-5.2-chat-latest": "gpt-5.2-chat-latest",
-    "gpt5.2-pro": "gpt-5.2-pro",
-    "gpt-5.2-pro": "gpt-5.2-pro",
-    "gpt5.2-codex": "gpt-5.2-codex",
-    "gpt-5.2-codex": "gpt-5.2-codex",
     "gpt5-mini": "gpt-5-mini",
     "gpt-5-mini": "gpt-5-mini",
     "gpt5-nano": "gpt-5-nano",
@@ -47,36 +41,6 @@ model_abbrev_to_id = {
 }
 
 DEFAULT_MODEL = "gpt-5-mini"
-
-
-def _normalize_message_content(content: Any) -> Any:
-    """Convert Chat Completions-style content items to Responses API items."""
-    if not isinstance(content, list):
-        return content
-
-    normalized = []
-    for item in content:
-        if not isinstance(item, dict):
-            normalized.append(item)
-            continue
-
-        item_type = item.get("type")
-        if item_type == "text":
-            normalized.append({"type": "input_text", "text": item.get("text", "")})
-            continue
-
-        normalized.append(item)
-    return normalized
-
-
-def _normalize_messages_for_responses(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Convert a list of chat messages to Responses API input items."""
-    normalized_messages = []
-    for message in messages:
-        normalized = dict(message)
-        normalized["content"] = _normalize_message_content(message.get("content"))
-        normalized_messages.append(normalized)
-    return normalized_messages
 
 
 def _get_field(item: Any, key: str) -> Any:
@@ -107,27 +71,10 @@ def _extract_output_text(response: Any) -> str:
             content_items = _get_field(item, "content") or []
             for content in content_items:
                 content_type = _get_field(content, "type")
-                if content_type in ("output_text", "text"):
+                if content_type == "output_text":
                     text = _get_field(content, "text")
                     if text:
                         return text
-                if content_type is None:
-                    text = _get_field(content, "text")
-                    if text:
-                        return text
-
-    # Fallback for endpoints that still return chat/completions-like payloads.
-    choices = _get_field(response, "choices")
-    if choices:
-        first_choice = choices[0]
-        message = _get_field(first_choice, "message")
-        if message:
-            text = _get_field(message, "content")
-            if text:
-                return text
-        text = _get_field(first_choice, "text")
-        if text:
-            return text
 
     return ""
 
@@ -233,11 +180,7 @@ def get_completion(
         reasoning_payload["effort"] = reasoning_effort
         kwargs["reasoning"] = reasoning_payload
 
-    request_input = _normalize_messages_for_responses(messages) if messages is not None else prompt
-
-    # GPT-5 models currently reject extremely small limits.
-    if max_output_tokens is not None and max_output_tokens < 16 and model_id.startswith("gpt-5"):
-        max_output_tokens = 16
+    request_input = messages if messages is not None else prompt
 
     base_wait = timeout if timeout is not None else 1.0
     for attempt in range(max_retries):

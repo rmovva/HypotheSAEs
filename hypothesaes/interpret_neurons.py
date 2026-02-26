@@ -158,7 +158,7 @@ class LLMConfig:
     temperature: Optional[float] = None # Temperature for the interpreter model
     max_output_tokens: Optional[int] = None # Maximum output tokens for each generated interpretation
     max_interpretation_tokens: Optional[int] = None # Backward-compatible alias for max_output_tokens
-    timeout: Optional[float] = 10.0 # Timeout for the interpreter model (in seconds)
+    timeout: Optional[float] = None # Optional timeout for the interpreter model (in seconds)
     reasoning_effort: Optional[str] = None # Optional reasoning effort setting for compatible models
     verbosity: Optional[str] = None # Optional verbosity setting for compatible models
     llm_kwargs: Dict[str, Any] = field(default_factory=dict) # Extra kwargs forwarded to get_completion()

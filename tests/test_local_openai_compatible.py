@@ -31,14 +31,27 @@ def _with_local_base_url():
     return _BaseUrlGuard()
 
 
+def _max_output_tokens_for_model(model: str, default: int = 16):
+    # Thinking models often produce long internal reasoning before the final short answer.
+    # Leave output uncapped for those models in integration tests.
+    return None if "thinking" in model.lower() else default
+
+
+def _timeout_for_model(model: str, default: float = 10.0) -> float:
+    return 180.0 if "thinking" in model.lower() else default
+
+
 def test_local_openai_completion():
     _require_local_openai_test()
     with _with_local_base_url() as local_model:
+        max_output_tokens = _max_output_tokens_for_model(local_model, default=16)
+        timeout = _timeout_for_model(local_model)
         completion = get_completion(
             prompt="Reply with exactly: hello",
             model=local_model,
-            max_output_tokens=16,
+            max_output_tokens=max_output_tokens,
             temperature=0.0,
+            timeout=timeout,
         )
     assert completion is not None
     assert len(completion.strip()) > 0
@@ -48,14 +61,17 @@ def test_local_openai_annotation_and_interpretation():
     _require_local_openai_test()
 
     with _with_local_base_url() as local_model:
+        max_output_tokens = _max_output_tokens_for_model(local_model, default=16)
+        timeout = _timeout_for_model(local_model)
         blue_concept = "contains words associated with the color blue"
         tasks = [(BLUE_SENTENCES[0], blue_concept), (RED_SENTENCES[0], blue_concept)]
         annotations = annotate(
             tasks,
             model=local_model,
             show_progress=False,
-            max_output_tokens=16,
+            max_output_tokens=max_output_tokens,
             temperature=0.0,
+            timeout=timeout,
         )
         assert blue_concept in annotations
         assert BLUE_SENTENCES[0] in annotations[blue_concept]
@@ -74,7 +90,7 @@ def test_local_openai_annotation_and_interpretation():
         interpreter = NeuronInterpreter(interpreter_model=local_model)
         config = InterpretConfig(
             sampling=SamplingConfig(n_examples=10),
-            llm=LLMConfig(max_output_tokens=32, temperature=0.0),
+            llm=LLMConfig(max_output_tokens=max_output_tokens, temperature=0.0, timeout=timeout),
         )
         results = interpreter.interpret_neurons(texts, activations, neuron_indices=[0], config=config)
         assert 0 in results

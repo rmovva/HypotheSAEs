@@ -58,6 +58,8 @@ def test_local_openai_base_url():
 
     base_url = os.getenv("LOCAL_OPENAI_BASE_URL", "http://0.0.0.0:8000/v1")
     model = os.getenv("LOCAL_OPENAI_MODEL", "Qwen/Qwen3-8B")
+    max_output_tokens = None if "thinking" in model.lower() else 16
+    timeout = 180.0 if "thinking" in model.lower() else None
 
     previous_base_url = os.environ.get("OPENAI_BASE_URL")
     try:
@@ -65,8 +67,9 @@ def test_local_openai_base_url():
         test_completion = get_completion(
             prompt="Reply with 'Hello, world!'",
             model=model,
-            max_output_tokens=16,
+            max_output_tokens=max_output_tokens,
             temperature=0.0,
+            timeout=timeout,
         )
         assert test_completion is not None
         assert len(test_completion.strip()) > 0

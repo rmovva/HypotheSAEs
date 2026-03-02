@@ -293,7 +293,7 @@ Optional parameters:
 - `interpret_temperature`: Temperature for interpretation generation (default: 0.7)
 - `max_interpretation_tokens`: Maximum tokens for interpretation (default: `None`, i.e. no explicit cap)
 - `interpret_llm_kwargs`: Extra Responses API kwargs for interpretation; default behavior uses no reasoning override (`reasoning_effort=None`)
-- `annotation_llm_kwargs`: Extra Responses API kwargs for annotation/scoring; default behavior sets `reasoning_effort="low"` for GPT-5 annotator models
+- `annotation_llm_kwargs`: Extra Responses API kwargs for annotation/scoring (for example, set `reasoning_effort` at call time if desired)
 - `n_candidate_interpretations`: Number of candidate interpretations per neuron (default: 1)
 - `n_scoring_examples`: Number of examples for scoring interpretations (default: 100)
 - `scoring_metric`: Metric for ranking interpretations ("f1", "precision", "recall", "correlation")

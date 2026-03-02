@@ -184,7 +184,6 @@ def interpret_sae(
         llm=LLMConfig(
             temperature=interpret_temperature,
             max_output_tokens=max_interpretation_tokens,
-            reasoning_effort=None,
             llm_kwargs=interpret_llm_kwargs or {},
         ),
         n_candidates=n_candidates,
@@ -316,7 +315,6 @@ def generate_hypotheses(
         llm=LLMConfig(
             temperature=interpret_temperature,
             max_output_tokens=max_interpretation_tokens,
-            reasoning_effort=None,
             llm_kwargs=interpret_llm_kwargs or {},
         ),
         n_candidates=n_candidate_interpretations,

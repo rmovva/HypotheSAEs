@@ -20,7 +20,7 @@ def _with_local_base_url():
         def __enter__(self):
             self.previous = os.environ.get("OPENAI_BASE_URL")
             os.environ["OPENAI_BASE_URL"] = os.getenv("LOCAL_OPENAI_BASE_URL", "http://0.0.0.0:8000/v1")
-            return os.getenv("LOCAL_OPENAI_MODEL", "Qwen/Qwen3-8B")
+            return os.getenv("LOCAL_OPENAI_MODEL", "Qwen/Qwen3.5-0.8B")
 
         def __exit__(self, exc_type, exc, tb):
             if self.previous is None:

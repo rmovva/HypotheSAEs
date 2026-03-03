@@ -57,7 +57,7 @@ def test_local_openai_base_url():
         pytest.skip("Set RUN_LOCAL_OPENAI_TEST=1 to run local OpenAI-compatible endpoint test.")
 
     base_url = os.getenv("LOCAL_OPENAI_BASE_URL", "http://0.0.0.0:8000/v1")
-    model = os.getenv("LOCAL_OPENAI_MODEL", "Qwen/Qwen3.5-0.8B")
+    model = os.getenv("LOCAL_OPENAI_MODEL", "Qwen/Qwen3-4B-Instruct-2507")
     max_output_tokens = None if "thinking" in model.lower() else 16
     timeout = 180.0 if "thinking" in model.lower() else None
 

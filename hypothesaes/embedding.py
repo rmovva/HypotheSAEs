@@ -223,6 +223,10 @@ def get_local_embeddings(
     if not texts_to_embed:
         return text2embedding
     
+    # Enable TF32-backed float32 matmul on supported GPUs to avoid repeated warnings
+    # from torch compile paths and improve embedding throughput.
+    torch.set_float32_matmul_precision("high")
+
     # Load model
     transformer_model = SentenceTransformer(model, device=device)
     print(f"Loaded model {model} to {device}")

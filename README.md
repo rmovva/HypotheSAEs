@@ -121,6 +121,7 @@ To use a local OpenAI-compatible endpoint (e.g., vLLM server), also set:
 ```bash
 export OPENAI_BASE_URL="http://0.0.0.0:8000/v1"
 ```
+When `OPENAI_BASE_URL` points to a non-OpenAI endpoint (for example `http://127.0.0.1:8000/v1` for vLLM), `OPENAI_KEY_SAE` is optional.
 
 ## Quickstart
 

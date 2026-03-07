@@ -1,9 +1,10 @@
 """LLM API utilities for HypotheSAEs."""
 
+import logging
 import os
 import time
-import logging
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 
 import openai
 
@@ -41,6 +42,7 @@ model_abbrev_to_id = {
 }
 
 DEFAULT_MODEL = "gpt-5-mini"
+LOCAL_OPENAI_API_KEY_PLACEHOLDER = "local-no-auth"
 
 
 def _get_field(item: Any, key: str) -> Any:
@@ -103,21 +105,39 @@ def normalize_llm_kwargs(
         resolved["max_output_tokens"] = default_max_output_tokens
     return resolved
 
+
+def _uses_openai_auth(base_url: Optional[str]) -> bool:
+    """Return True when the request targets OpenAI's hosted API."""
+    if not base_url:
+        return True
+
+    parsed = urlparse(base_url)
+    hostname = (parsed.hostname or "").lower()
+    return hostname == "openai.com" or hostname.endswith(".openai.com")
+
+
+def _resolve_api_key(base_url: Optional[str]) -> str:
+    api_key = os.environ.get("OPENAI_KEY_SAE")
+    if api_key and "..." not in api_key:
+        return api_key
+    if _uses_openai_auth(base_url):
+        raise ValueError(
+            "Please set the OPENAI_KEY_SAE environment variable when using the OpenAI API."
+        )
+    return LOCAL_OPENAI_API_KEY_PLACEHOLDER
+
 def get_client():
     """
     Get an OpenAI-compatible client.
 
-    - OPENAI_KEY_SAE: required API key (OpenAI cloud or dummy for vLLM)
-    - OPENAI_BASE_URL: optional base URL to point at a vLLM/OpenAI-compatible server
+    - OPENAI_KEY_SAE: required for OpenAI-hosted requests
+    - OPENAI_BASE_URL: optional base URL to point at a local/OpenAI-compatible server
       (fallback is OpenAI cloud)
     """
     global _CLIENT_OPENAI
 
-    api_key = os.environ.get("OPENAI_KEY_SAE")
-    if api_key is None or "..." in api_key:
-        raise ValueError("Please set the OPENAI_KEY_SAE environment variable before using functions which require the OpenAI API.")
-
     base_url = os.environ.get("OPENAI_BASE_URL")
+    api_key = _resolve_api_key(base_url)
     cache_key = (api_key, base_url or "__openai_default__")
     if cache_key in _CLIENT_OPENAI:
         return _CLIENT_OPENAI[cache_key]

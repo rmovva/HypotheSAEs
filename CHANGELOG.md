@@ -4,11 +4,17 @@ New version releases for HypotheSAEs will be documented here.
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-03-08
+
 ### Changed
 - LLM requests now use the OpenAI Responses API via a unified inference path for all models.
 - Added `OPENAI_BASE_URL` support so OpenAI-compatible endpoints (e.g., vLLM server mode) can be used without separate local-model routing.
 - Annotation and interpretation now accept flexible request kwargs (for example `reasoning_effort`, `verbosity`, and token controls) instead of hard-coding model-specific argument branches.
 - Updated default interpreter/annotator model names to `gpt-5.2` and `gpt-5-mini`.
+- Local OpenAI-compatible endpoints no longer require `OPENAI_KEY_SAE` when `OPENAI_BASE_URL` points to a non-OpenAI host.
+- Interpretation/annotation defaults were relaxed for compatibility with thinking models: no timeout is applied unless explicitly requested, token clamps were removed, and parsing now tolerates reasoning output.
+- Local quickstart notebooks and tests were refreshed around the unified API flow and current Qwen local-model defaults.
+- Local embedding setup now enables high float32 matmul precision for better throughput on supported GPUs.
 - Removed the older in-process `vllm` inference path; local usage now goes through OpenAI-compatible serving only.
 
 ### Added

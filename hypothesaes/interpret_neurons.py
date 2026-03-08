@@ -7,8 +7,7 @@ import concurrent.futures
 import os
 from dataclasses import dataclass, field
 
-from .llm_api import get_completion
-from .llm_local import is_local_model, get_local_completions
+from .llm_api import get_completion, normalize_llm_kwargs
 from .utils import load_prompt, truncate_text
 from .annotate import annotate, CACHE_DIR
 
@@ -16,8 +15,6 @@ DEFAULT_TASK_SPECIFIC_INSTRUCTIONS = """An example feature could be:
 - "uses multiple adjectives to describe colors"
 - "describes a patient experiencing seizures or epilepsy"
 - "contains multiple single-digit numbers\""""
-
-DEFAULT_MAX_INTERPRETATION_TOKENS_THINKING = 8192
 
 def sample_top_zero(
     texts: List[str],
@@ -159,9 +156,13 @@ class SamplingConfig:
 @dataclass
 class LLMConfig:
     temperature: Optional[float] = None # Temperature for the interpreter model
-    max_interpretation_tokens: int = 100 # Maximum number of tokens for each generated interpretation
-    timeout: float = 10.0 # Timeout for the interpreter model (in seconds)
-    tokenizer_kwargs: Dict[str, Any] = field(default_factory=lambda: {"enable_thinking": True}) # tokenizer_kwargs are not used for API models
+    max_output_tokens: Optional[int] = None # Maximum output tokens for each generated interpretation
+    max_interpretation_tokens: Optional[int] = None # Backward-compatible alias for max_output_tokens
+    timeout: Optional[float] = None # Optional timeout for the interpreter model (in seconds)
+    reasoning_effort: Optional[str] = None # Optional reasoning effort setting for compatible models
+    verbosity: Optional[str] = None # Optional verbosity setting for compatible models
+    llm_kwargs: Dict[str, Any] = field(default_factory=dict) # Extra kwargs forwarded to get_completion()
+    tokenizer_kwargs: Dict[str, Any] = field(default_factory=dict) # Deprecated local-only arg; ignored for API-based inference
 
 @dataclass
 class InterpretConfig:
@@ -181,8 +182,8 @@ class ScoringConfig:
 class NeuronInterpreter:
     def __init__(
         self,
-        interpreter_model: str = "gpt-4.1",
-        annotator_model: str = "gpt-4.1-mini",
+        interpreter_model: str = "gpt-5.2",
+        annotator_model: str = "gpt-5-mini",
         n_workers_interpretation: int = 10,
         n_workers_annotation: int = 30,
         cache_name: Optional[str] = None,
@@ -247,36 +248,52 @@ class NeuronInterpreter:
                 response = response[len(prefix):]
         
         return response.strip('"').strip()
+
+    def _resolve_llm_kwargs(
+        self,
+        config: InterpretConfig,
+        llm_kwargs: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[Dict[str, Any], Optional[float]]:
+        """Resolve request kwargs from config defaults and call-time overrides."""
+        default_max_output_tokens = config.llm.max_output_tokens
+        if default_max_output_tokens is None:
+            default_max_output_tokens = config.llm.max_interpretation_tokens
+
+        merged_kwargs = dict(config.llm.llm_kwargs)
+        if llm_kwargs:
+            merged_kwargs.update(llm_kwargs)
+        # Backward compatibility: ignore kwargs used only by direct vLLM generation.
+        merged_kwargs.pop("tokenizer_kwargs", None)
+        merged_kwargs.pop("llm_sampling_kwargs", None)
+
+        resolved = normalize_llm_kwargs(
+            merged_kwargs,
+            default_verbosity=config.llm.verbosity,
+            default_reasoning_effort=config.llm.reasoning_effort,
+            default_timeout=config.llm.timeout,
+            default_max_output_tokens=default_max_output_tokens,
+        )
+        timeout = resolved.pop("timeout", None)
+        if "temperature" not in resolved and config.llm.temperature is not None:
+            resolved["temperature"] = config.llm.temperature
+        return resolved, timeout
  
     def _get_interpretation_openai(
         self,
         prompt: str,
-        config: InterpretConfig,
+        llm_kwargs: Optional[Dict[str, Any]] = None,
+        timeout: Optional[float] = None,
     ) -> Optional[str]:
         """Send a single prompt to the interpreter model and return the parsed interpretation."""
         try:
-            if "gpt-5" in self.interpreter_model:
-                response = get_completion(
-                    prompt=prompt,
-                    model=self.interpreter_model,
-                    max_completion_tokens=config.llm.max_interpretation_tokens,
-                    reasoning_effort="minimal",
-                )
-            elif self.interpreter_model.startswith("o"):
-                response = get_completion(
-                    prompt=prompt,
-                    model=self.interpreter_model,
-                    max_completion_tokens=config.llm.max_interpretation_tokens,
-                    reasoning_effort="low",
-                )
-            else:
-                response = get_completion(
-                    prompt=prompt,
-                    model=self.interpreter_model,
-                    temperature=config.llm.temperature,
-                    max_tokens=config.llm.max_interpretation_tokens,
-                    timeout=config.llm.timeout,
-                )
+            request_kwargs = dict(llm_kwargs or {})
+            if timeout is not None:
+                request_kwargs["timeout"] = timeout
+            response = get_completion(
+                prompt=prompt,
+                model=self.interpreter_model,
+                **request_kwargs,
+            )
             return self._parse_interpretation(response)
         except Exception as e:
             print(f"Failed to get interpretation: {e}")
@@ -285,7 +302,8 @@ class NeuronInterpreter:
     def _execute_prompts(
         self,
         prompts: List[str],
-        config: InterpretConfig,
+        llm_kwargs: Dict[str, Any],
+        timeout: Optional[float],
     ) -> List[str]:
         """Execute a batch of prompts and return parsed interpretations (one per prompt)."""
         # Remove ``None`` before sending for completion
@@ -293,28 +311,15 @@ class NeuronInterpreter:
         if not valid_prompts:
             return []
 
-        # For local models (vLLM), use a single call to get_local_completions
-        llm_sampling_kwargs = {"temperature": config.llm.temperature} if config.llm.temperature is not None else {}
-        if is_local_model(self.interpreter_model):
-            # If enable_thinking is True, set max_interpretation_tokens to DEFAULT_MAX_INTERPRETATION_TOKENS_THINKING if it is lower than that
-            if "enable_thinking" in config.llm.tokenizer_kwargs:
-                if config.llm.tokenizer_kwargs["enable_thinking"]:
-                    if config.llm.max_interpretation_tokens < DEFAULT_MAX_INTERPRETATION_TOKENS_THINKING:
-                        config.llm.max_interpretation_tokens = DEFAULT_MAX_INTERPRETATION_TOKENS_THINKING
-
-            raw_responses = get_local_completions(
-                valid_prompts,
-                model=self.interpreter_model,
-                tokenizer_kwargs=config.llm.tokenizer_kwargs,
-                max_tokens=config.llm.max_interpretation_tokens,
-                llm_sampling_kwargs=llm_sampling_kwargs,
-            )
-            return [self._parse_interpretation(r) for r in raw_responses]
-
-        # Use parallel threads to generate interpretations for API models
+        # Use parallel threads for API calls.
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.n_workers_interpretation) as executor:
             future_to_idx = {
-                executor.submit(self._get_interpretation_openai, p, config): i
+                executor.submit(
+                    self._get_interpretation_openai,
+                    p,
+                    llm_kwargs=llm_kwargs,
+                    timeout=timeout,
+                ): i
                 for i, p in enumerate(valid_prompts)
             }
 
@@ -335,10 +340,12 @@ class NeuronInterpreter:
         texts: List[str],
         activations: np.ndarray,
         neuron_indices: List[int],
-        config: Optional[InterpretConfig] = None
+        config: Optional[InterpretConfig] = None,
+        **llm_kwargs,
     ) -> Dict[int, List[str]]:
         """Generate interpretations for multiple neurons with multiple candidates each."""
         config = config or InterpretConfig()
+        llm_kwargs, timeout = self._resolve_llm_kwargs(config, llm_kwargs)
         interpretation_tasks = [
             (neuron_idx, candidate_idx)
             for neuron_idx in neuron_indices
@@ -360,7 +367,7 @@ class NeuronInterpreter:
             prompts.append(prompt)
 
         # Execute all valid prompts in a single batch (implementation-aware)
-        generated_interpretations = self._execute_prompts(prompts, config)
+        generated_interpretations = self._execute_prompts(prompts, llm_kwargs, timeout)
 
         # Stitch responses back to their respective tasks / neurons
         interpretations_iterator = iter(generated_interpretations)

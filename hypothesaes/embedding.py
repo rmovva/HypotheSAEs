@@ -27,7 +27,7 @@ def _embed_batch_openai(
         max_tokens: int = 8192, 
         max_retries: int = 3, 
         backoff_factor: float = 3.0,
-        timeout: float = 10.0
+        timeout: Optional[float] = None
 ) -> List[List[float]]:
     """Helper function for batch embedding using OpenAI API."""
     # Truncate texts to max tokens
@@ -42,18 +42,21 @@ def _embed_batch_openai(
     
     for attempt in range(max_retries):
         try:
-            response = client.embeddings.create(
-                input=truncated_batch,
-                model=model,
-                timeout=timeout
-            )
+            request_kwargs = {
+                "input": truncated_batch,
+                "model": model,
+            }
+            if timeout is not None:
+                request_kwargs["timeout"] = timeout
+            response = client.embeddings.create(**request_kwargs)
             return [data.embedding for data in response.data]
             
         except (openai.RateLimitError, openai.APITimeoutError) as e:
             if attempt == max_retries - 1:  # Last attempt
                 raise e
             
-            wait_time = timeout * (backoff_factor ** attempt)
+            base_wait = timeout if timeout is not None else 1.0
+            wait_time = base_wait * (backoff_factor ** attempt)
             if attempt > 0:
                 print(f"API error: {e}; retrying in {wait_time:.1f}s... ({attempt + 1}/{max_retries})")
             time.sleep(wait_time)
@@ -141,7 +144,7 @@ def get_openai_embeddings(
     cache_name: Optional[str] = None,
     show_progress: bool = True,
     chunk_size: int = 50000,
-    timeout: float = 10.0,
+    timeout: Optional[float] = None,
 ) -> Dict[str, np.ndarray]:
     """Get embeddings using OpenAI API with parallel processing and chunked caching."""
     # Filter out None values and empty strings
@@ -220,6 +223,10 @@ def get_local_embeddings(
     if not texts_to_embed:
         return text2embedding
     
+    # Enable TF32-backed float32 matmul on supported GPUs to avoid repeated warnings
+    # from torch compile paths and improve embedding throughput.
+    torch.set_float32_matmul_precision("high")
+
     # Load model
     transformer_model = SentenceTransformer(model, device=device)
     print(f"Loaded model {model} to {device}")

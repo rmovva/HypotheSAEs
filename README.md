@@ -100,7 +100,7 @@ pip install -e .
 ```
 
 This install is sufficient for the main workflows, including using a local OpenAI-compatible endpoint such as `vllm serve`.
-The Python `vllm` package is only needed for the older in-process local generation utilities in [`hypothesaes/llm_local.py`](hypothesaes/llm_local.py), and can be installed separately if you use that path.
+HypotheSAEs no longer includes an in-process `vllm` inference path; local LLM usage is supported through OpenAI-compatible servers only.
 
 ### Option 2: Install from PyPI
 

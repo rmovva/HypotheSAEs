@@ -9,6 +9,7 @@ New version releases for HypotheSAEs will be documented here.
 - Added `OPENAI_BASE_URL` support so OpenAI-compatible endpoints (e.g., vLLM server mode) can be used without separate local-model routing.
 - Annotation and interpretation now accept flexible request kwargs (for example `reasoning_effort`, `verbosity`, and token controls) instead of hard-coding model-specific argument branches.
 - Updated default interpreter/annotator model names to `gpt-5.2` and `gpt-5-mini`.
+- Removed the older in-process `vllm` inference path; local usage now goes through OpenAI-compatible serving only.
 
 ### Added
 - Optional test coverage for local OpenAI-compatible endpoints (guarded by `RUN_LOCAL_OPENAI_TEST=1`).
@@ -41,7 +42,6 @@ Incrementing to 1.0.0 because multi-SAE hypothesis generation has been removed, 
 ## [0.3.0] - 2025-07-28
 
 ### Added
-- `llm_local.py` module for local LLM inference with vLLM, `tests/test_local_llm.py` for unit tests
 - `quickstart_local.ipynb` notebook to get started with local LLMs
 - `local_llm_experiments` contains experiments benchmarking local LLMs for autointerp and concept annotation
 

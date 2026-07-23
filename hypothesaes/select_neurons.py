@@ -161,10 +161,19 @@ def select_neurons_separation_score(
     scores = []
     for i in range(activations.shape[1]):
         neuron_acts = activations[:, i]
-        sorted_indices = np.argsort(-neuron_acts)
-        
-        # Get mean target value for top n activations
-        top_mean = np.mean(target[sorted_indices[:n_top_activating]])
+        nonzero_mask = neuron_acts >= 0
+
+        # Find all instances where activation is positive
+        nonzero_indices = np.where(nonzero_mask)[0]
+        n_positive = len(nonzero_indices)
+        sorted_nonzero_indices = nonzero_indices[np.argsort(-neuron_acts[nonzero_indices])]
+
+        # Get mean target value for top n activations, 0 if neuron is dead
+        top_mean = np.mean(target[sorted_nonzero_indices[:n_top_activating]]) if n_positive != 0 else 0
+
+        # Print warning message if fewer than n_top_activating positive activations
+        if n_positive < n_top_activating:
+            print(f"[WARNING] Only found {n_positive} examples with positive activation for neuron {i}, using all available to calculate separation score")
         
         # Get mean target value for zero activations
         zero_indices = neuron_acts == 0

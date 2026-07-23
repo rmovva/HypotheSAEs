@@ -153,6 +153,7 @@ def get_completion(
     prompt: Optional[str] = None,
     *,
     messages: Optional[List[Dict[str, Any]]] = None,
+    system_prompt: Optional[str] = None,
     model: str = DEFAULT_MODEL,
     timeout: Optional[float] = None,
     max_retries: int = 3,
@@ -200,7 +201,22 @@ def get_completion(
         reasoning_payload["effort"] = reasoning_effort
         kwargs["reasoning"] = reasoning_payload
 
-    request_input = messages if messages is not None else prompt
+    if messages is not None:
+        if system_prompt is not None:
+            has_system = any(m.get("role") == "system" for m in messages)
+            if has_system:
+                raise ValueError("system_prompt was provided, but messages already contains a system message")
+            request_input = [{"role": "system", "content": system_prompt}, *messages]
+        else:
+            request_input = messages
+    else:
+        if system_prompt is not None:
+            request_input = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt},
+            ]
+        else:
+            request_input = prompt
 
     base_wait = timeout if timeout is not None else 1.0
     for attempt in range(max_retries):

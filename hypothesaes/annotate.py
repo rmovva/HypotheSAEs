@@ -1,13 +1,15 @@
 """Text annotation using LLM-based concept checking."""
 
 import numpy as np
-from typing import List, Optional, Dict, Tuple
+from typing import List, Optional, Dict, Tuple, Callable
 import concurrent.futures
 from tqdm.auto import tqdm
 import os
 import json
 from pathlib import Path
 import time
+import re
+import json
 
 from .llm_api import get_completion, normalize_llm_kwargs
 from .utils import load_prompt, truncate_text
@@ -56,11 +58,32 @@ def parse_completion(completion: str) -> int:
         completion = completion.split('</think>')[1].strip()
     return 1 if completion.startswith("yes") else 0 if completion.startswith("no") else None
 
+def parse_completion_json(completion: str) -> Optional[int]:
+    """Parse a JSON completion into an annotation.
+    
+    Returns 1 for "yes", 0 for "no", -1 for "not_found", None if parsing fails.
+    """
+    if '</think>' in completion:
+        completion = completion.split('</think>')[1].strip()
+    match = re.search(r'\{.*\}', completion, re.DOTALL)
+    if not match:
+        return None
+    try:
+        cleaned = re.sub(r'\\(?!["\\/bfnrt]|u[0-9a-fA-F]{4})', '', match.group(0))
+        parsed = json.loads(cleaned)
+    except json.JSONDecodeError:
+        return None
+
+    answer = parsed.get("answer", "").strip().lower()
+    return 1 if answer == "yes" else 0 if answer == "no" else None
+
 def annotate_single_text(
     text: str,
     concept: str,
     annotate_prompt_name: str = "annotate",
     model: str = "gpt-5-mini",
+    parse_fn: Callable[[str], int] = parse_completion,
+    system_prompt_name: Optional[str] = None,
     max_words_per_example: Optional[int] = None,
     temperature: Optional[float] = None,
     max_output_tokens: Optional[int] = None,
@@ -78,6 +101,7 @@ def annotate_single_text(
         text = truncate_text(text, max_words_per_example)
         
     annotate_prompt = load_prompt(annotate_prompt_name)
+    system_prompt = load_prompt(system_prompt_name) if system_prompt_name is not None else None
     prompt = annotate_prompt.format(hypothesis=concept, text=text)
     
     total_api_time = 0.0
@@ -100,11 +124,12 @@ def annotate_single_text(
 
             response_text = get_completion(
                 prompt=prompt,
+                system_prompt=system_prompt,
                 **request_kwargs
             ).strip().lower()
             total_api_time += time.time() - start_time
             
-            annotation = parse_completion(response_text)
+            annotation = parse_fn(response_text)
             if annotation is not None:
                 return annotation, total_api_time
             
@@ -122,6 +147,8 @@ def _parallel_annotate(
     n_workers: int,
     results: Dict[str, Dict[str, int]],
     cache: Optional[dict] = None,
+    cache_path: Optional[str] = None,
+    checkpoint_every: int = 1000,
     progress_desc: str = "Annotating",
     show_progress: bool = True,
     **annotation_kwargs
@@ -140,13 +167,17 @@ def _parallel_annotate(
                        total=len(tasks),
                        desc=progress_desc,
                        disable=not show_progress)
-        
+
+        completed = 0
         for future in iterator:
             text, concept = future_to_task[future]
             try:
                 annotation, _ = future.result()
                 if annotation is not None:
                     _store_annotation(results, concept, text, annotation, cache)
+                completed += 1
+                if completed % checkpoint_every == 0 and cache_path is not None:
+                    save_annotation_cache(cache_path, cache)
             except Exception as e:
                 retry_tasks.append((text, concept))
                 print(f"Failed to annotate text for concept '{concept}': {e}")
@@ -221,6 +252,7 @@ def annotate(
             model=model,
             n_workers=n_workers,
             cache=cache,
+            cache_path=cache_path,
             results=results,
             show_progress=show_progress,
             progress_desc=progress_desc,

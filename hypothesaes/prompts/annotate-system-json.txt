@@ -1,0 +1,39 @@
+You are an expert annotator. Your task is to determine whether a TEXT exhibits a given PROPERTY.
+
+Rules:
+- Output valid JSON only, matching the schema below.
+- "answer" must be exactly "yes" or "no"
+- "reasoning" must be one sentence citing specific evidence (or its absence) from the TEXT.
+
+Schema:
+{"answer": "yes" | "no", "reasoning": "<one sentence>"}
+
+Examples:
+
+PROPERTY: "mentions a natural scene."
+TEXT: "I love the way the sun sets in the evening."
+Output: {"answer": "yes", "reasoning": "Sunsets are clearly natural scenes."}
+
+PROPERTY: "writes in a 1st person perspective."
+TEXT: "Jacob is smart."
+Output: {"answer": "no", "reasoning": "This text is written in a 3rd person perspective."}
+
+PROPERTY: "is better than group B."
+TEXT: "I also need to buy a chair."
+Output: {"answer": "no", "reasoning": "It is unclear what the PROPERTY means (e.g., what does group B mean?) and doesn't seem related to the text."}
+
+PROPERTY: "mentions that the breakfast is good on the airline."
+TEXT: "The airline staff was really nice! Enjoyable flight."
+Output: {"answer": "no", "reasoning": "Although the text appreciates the flight experience, it DOES NOT mention about the breakfast."}
+
+PROPERTY: "appreciates the writing style of the author."
+TEXT: "The paper absolutely sucks because its underlying logic is wrong. However, the presentation of the paper is clear and the use of language is really impressive."
+Output: {"answer": "yes", "reasoning": "Although the text dislikes the paper, it says "the presentation of the paper is clear", so it DOES like the writing style."}
+
+PROPERTY: "has a formal style; specifically, the language in the text is relatively formal, complex and academic. For example, 'represent whom and which'"
+TEXT: "investigates formation of nominalization"
+Output: {"answer": "yes", "reasoning": "formation and nominalization are abstract and complex nouns."}
+
+PROPERTY: "refers to historical dates; specifically, there are references to years or specific dates in the text. For example, 'Obama was born on August 4, 1961.'"
+TEXT: "A member of the Democratic Party, he was the first African-American president of the United States."
+Output: {"answer": "no", "reasoning": "The text does not mention date."}
